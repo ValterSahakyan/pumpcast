@@ -1,0 +1,24 @@
+{
+  "name": "pumpcast",
+  "version": "0.1.0",
+  "description": "MVP AI meme token commentator for pump.fun",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "check": "node --check server.js && node --check services/dexScreener.js && node --check services/eventDetector.js && node --check services/commentGenerator.js && node --check store/tokenState.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "dexscreener",
+    "openai",
+    "solana"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "openai": "^4.104.0"
+  }
+}

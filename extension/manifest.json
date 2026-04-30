@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Pumpcast MemeRace Commentator",
+  "version": "0.1.0",
+  "description": "Adds a live AI commentator overlay to pump.fun coin pages.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://pump.fun/coin/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "widget.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "dark.png",
+    "32": "dark.png",
+    "48": "dark.png",
+    "128": "dark.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "light.png",
+        "dark.png"
+      ],
+      "matches": [
+        "https://pump.fun/*"
+      ]
+    }
+  ],
+  "permissions": [],
+  "host_permissions": [
+    "https://pump.fun/*",
+    "http://localhost:3001/*"
+  ]
+}
