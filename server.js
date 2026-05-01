@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const cors = require("cors");
 const express = require("express");
+const path = require("path");
 
 const {
   fetchDexScreenerMarketData,
@@ -13,6 +14,7 @@ const tokenStateStore = require("./store/tokenState");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
+const landingDistDir = path.join(__dirname, "landing-react", "dist");
 const allowedOriginConfig = process.env.ALLOWED_ORIGIN || "*";
 const allowedOrigins =
   allowedOriginConfig === "*"
@@ -45,7 +47,7 @@ app.use(
   })
 );
 app.use(express.json());
-app.use(express.static("landing-react/dist"));
+app.use(express.static(landingDistDir));
 app.use(express.static("."));
 
 app.get("/health", (_req, res) => {
@@ -122,6 +124,15 @@ app.get("/api/commentator", async (req, res) => {
       details: error.message,
     });
   }
+});
+
+app.get("*", (req, res, next) => {
+  if (req.path.startsWith("/api/")) {
+    next();
+    return;
+  }
+
+  res.sendFile(path.join(landingDistDir, "index.html"));
 });
 
 app.use((error, _req, res, _next) => {
