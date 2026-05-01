@@ -74,13 +74,32 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
+    env:
+      SSH_HOST: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_HOST || secrets.SERVER_HOST }}
+      SSH_USER: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || secrets.SERVER_USER }}
+      SSH_KEY: ${{ secrets.DEPLOY_KEY != '' && secrets.DEPLOY_KEY || secrets.SSH_PRIVATE_KEY }}
     steps:
+      - name: Validate deploy secrets
+        run: |
+          if [ -z "${SSH_HOST}" ]; then
+            echo "Missing SSH host. Set DEPLOY_HOST or SERVER_HOST in GitHub Actions secrets."
+            exit 1
+          fi
+          if [ -z "${SSH_USER}" ]; then
+            echo "Missing SSH username. Set DEPLOY_USER or SERVER_USER in GitHub Actions secrets."
+            exit 1
+          fi
+          if [ -z "${SSH_KEY}" ]; then
+            echo "Missing SSH private key. Set DEPLOY_KEY or SSH_PRIVATE_KEY in GitHub Actions secrets."
+            exit 1
+          fi
+
       - name: Deploy to Server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DEPLOY_HOST }}
-          username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.DEPLOY_KEY }}
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
           script: |
             cd ~/pumpcast
             docker-compose pull
