@@ -390,6 +390,7 @@ function App() {
             <div className="footer-links">
               <h4>Connect</h4>
               <ul>
+                <li><a href="https://x.com/pump_cast_ai" target="_blank" rel="noreferrer">X (Twitter)</a></li>
                 <li><a href="https://telegram.me/yogurtsoftware" target="_blank" rel="noreferrer">Telegram</a></li>
                 <li><a href="mailto:hello@pumpcast.co">hello@pumpcast.co</a></li>
                 <li><a href="/privacy-policy">Privacy Policy</a></li>

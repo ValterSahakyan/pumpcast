@@ -462,6 +462,8 @@
         <div class="pumpcast-footer">
           <a href="https://pumpcast.co" target="_blank">pumpcast.co</a>
           <span>&bull;</span>
+          <a href="https://x.com/pump_cast_ai" target="_blank">X</a>
+          <span>&bull;</span>
           <a href="https://telegram.me/yogurtsoftware" target="_blank">Telegram</a>
           <span>&bull;</span>
           <a href="mailto:hello@pumpcast.co">hello@pumpcast.co</a>
