@@ -2,9 +2,111 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import './index.css'
 
+function PrivacyPolicyPage() {
+  return (
+    <div className="policy-shell">
+      <div className="ambient-bg policy-ambient">
+        <div className="ambient-blob blob-1"></div>
+        <div className="ambient-blob blob-2"></div>
+        <div className="ambient-blob blob-3"></div>
+      </div>
+
+      <main className="policy-main">
+        <div className="container policy-container">
+          <a href="/" className="policy-back">Back to PumpCast</a>
+
+          <div className="policy-card">
+            <span className="section-eyebrow">Privacy Policy</span>
+            <h1>PumpCast AI Privacy Policy</h1>
+            <p className="policy-updated">Last updated: May 1, 2026</p>
+
+            <p>
+              PumpCast AI is a Chrome extension that adds a live commentary widget to
+              pump.fun coin pages. This policy explains what information the extension
+              accesses, how it is used, and how to contact us.
+            </p>
+
+            <h2>What We Collect</h2>
+            <p>
+              The extension reads limited website content from the currently open
+              `pump.fun/coin/...` page, specifically the token page context needed to
+              provide commentary for that token.
+            </p>
+            <p>We do not intentionally collect:</p>
+            <ul>
+              <li>Name, email address, or other direct personal identifiers</li>
+              <li>Passwords, credentials, or authentication secrets</li>
+              <li>Payment card data or banking information</li>
+              <li>Private messages, emails, or personal communications</li>
+              <li>Browsing history across websites</li>
+              <li>Keystrokes, form entries, or clipboard contents</li>
+            </ul>
+
+            <h2>How We Use Information</h2>
+            <p>We use the page and token context only to:</p>
+            <ul>
+              <li>Identify the current pump.fun token page</li>
+              <li>Request AI-generated commentary for that token</li>
+              <li>Display commentary and audio playback inside the extension</li>
+            </ul>
+
+            <h2>Data Sent to Our Backend</h2>
+            <p>
+              When commentary is requested, the extension may send the token address
+              and selected commentary mode to the PumpCast backend API so the service
+              can generate a response.
+            </p>
+
+            <h2>Remote Code</h2>
+            <p>
+              PumpCast AI does not download or execute remotely hosted JavaScript or
+              WASM. All executable extension code is packaged with the extension.
+              Network requests are used only to retrieve data needed for the
+              extension&apos;s functionality.
+            </p>
+
+            <h2>Sharing</h2>
+            <p>
+              We do not sell user data. We do not use or transfer user data for
+              advertising, creditworthiness, lending decisions, or purposes unrelated
+              to the extension&apos;s single purpose.
+            </p>
+
+            <h2>Data Retention</h2>
+            <p>
+              The extension stores recent commentary locally in memory for the current
+              session to show the on-page history feed. If backend logs are retained
+              for operations, debugging, or abuse prevention, they should be limited
+              to what is reasonably necessary.
+            </p>
+
+            <h2>Security</h2>
+            <p>
+              We take reasonable steps to protect service infrastructure and limit data
+              use to the functionality described in this policy.
+            </p>
+
+            <h2>Changes</h2>
+            <p>
+              We may update this Privacy Policy from time to time. Material updates
+              will be reflected by changing the date at the top of this page.
+            </p>
+
+            <h2>Contact</h2>
+            <p>
+              For privacy questions, contact <a href="mailto:hello@pumpcast.co">hello@pumpcast.co</a>.
+            </p>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}
+
 function App() {
   const [scrolled, setScrolled] = useState(false)
   const [activeVoice, setActiveVoice] = useState('chad')
+  const isPrivacyPolicyPage = window.location.pathname === '/privacy-policy'
 
   useEffect(() => {
     const handleScroll = () => {
@@ -53,6 +155,10 @@ function App() {
       }
     }
   };
+
+  if (isPrivacyPolicyPage) {
+    return <PrivacyPolicyPage />
+  }
 
   return (
     <div className="app-wrapper">
@@ -287,6 +393,7 @@ function App() {
                 <li><a href="https://telegram.me/yogurtsoftware" target="_blank" rel="noreferrer">Telegram</a></li>
                 <li><a href="mailto:hello@pumpcast.co">hello@pumpcast.co</a></li>
                 <li><a href="https://github.com/ValterSahakyan/pumpcast" target="_blank" rel="noreferrer">GitHub</a></li>
+                <li><a href="/privacy-policy">Privacy Policy</a></li>
               </ul>
             </div>
             <div className="footer-links">
