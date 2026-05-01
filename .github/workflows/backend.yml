@@ -113,6 +113,15 @@ jobs:
               exit 1
             fi
 
+            if [ -d ".git" ]; then
+              git fetch origin main
+              git checkout main
+              git pull --ff-only origin main
+            else
+              echo "Deploy directory is not a git checkout."
+              exit 1
+            fi
+
             # Remove stale Docker containers already publishing the app port.
             RUNNING_ON_PORT="$(docker ps -q --filter "publish=${APP_PORT}")"
             if [ -n "$RUNNING_ON_PORT" ]; then

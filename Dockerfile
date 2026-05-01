@@ -1,22 +1,25 @@
+FROM node:20-alpine AS landing-build
+
+WORKDIR /build/landing-react
+
+COPY landing-react/package*.json ./
+RUN npm install
+
+COPY landing-react/ ./
+RUN npm run build
+
 FROM node:20-alpine
 
-# Create app directory
 WORKDIR /usr/src/app
 
-# Install app dependencies
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
 COPY package*.json ./
+RUN npm install --omit=dev
 
-RUN npm install --production
+COPY server.js ./
+COPY services ./services
+COPY store ./store
+COPY --from=landing-build /build/landing-react/dist ./landing-react/dist
 
-# Bundle app source
-COPY . .
-
-# Delete the extension folder from the server image to keep it lean
-RUN rm -rf extension
-
-# Expose port (default 3001)
 EXPOSE 3001
 
-# Start the server
-CMD [ "npm", "start" ]
+CMD ["npm", "start"]
