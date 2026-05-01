@@ -112,6 +112,13 @@ jobs:
               fi
             }
 
+            get_systemd_unit_for_pid() {
+              PID="$1"
+              if [ -r "/proc/${PID}/cgroup" ]; then
+                sed -n 's|.*\/\([^/][^/]*\.service\)$|\1|p' "/proc/${PID}/cgroup" | head -n 1
+              fi
+            }
+
             clear_app_port() {
               PORT_PIDS="$(get_port_pids)"
               if [ -n "$PORT_PIDS" ]; then
@@ -127,12 +134,34 @@ jobs:
                 sleep 2
               fi
 
+              PORT_PIDS="$(get_port_pids)"
+              if [ -n "$PORT_PIDS" ] && command -v systemctl >/dev/null 2>&1; then
+                for PID in $PORT_PIDS; do
+                  UNIT="$(get_systemd_unit_for_pid "$PID")"
+                  if [ -n "$UNIT" ]; then
+                    echo "Stopping systemd unit ${UNIT} for PID ${PID}"
+                    systemctl stop "$UNIT" || true
+                  fi
+                done
+                sleep 2
+              fi
+
               for i in 1 2 3 4 5; do
                 PORT_PIDS="$(get_port_pids)"
                 if [ -z "$PORT_PIDS" ]; then
                   return 0
                 fi
                 echo "Waiting for port ${APP_PORT} to be released (attempt $i): $PORT_PIDS"
+                if command -v systemctl >/dev/null 2>&1; then
+                  for PID in $PORT_PIDS; do
+                    UNIT="$(get_systemd_unit_for_pid "$PID")"
+                    if [ -n "$UNIT" ]; then
+                      echo "Port holder details: PID=${PID}, UNIT=${UNIT}"
+                    else
+                      ps -p "$PID" -o pid=,ppid=,user=,comm=,args= || true
+                    fi
+                  done
+                fi
                 sleep 2
               done
 
