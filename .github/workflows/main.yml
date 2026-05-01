@@ -1,3 +1,12 @@
+# This workflow will build the extension and the landing page Docker image.
+# 
+# MANDATORY GITHUB SECRETS TO ADD:
+# 1. SERVER_HOST: Your server IP address
+# 2. SERVER_USER: Your SSH username (e.g., root)
+# 3. SSH_PRIVATE_KEY: Your private SSH key (~/.ssh/id_rsa)
+# 4. DOCKERHUB_USERNAME: Your Docker Hub username (if pushing)
+# 5. DOCKERHUB_TOKEN: Your Docker Hub access token (if pushing)
+
 name: CI/CD Pipeline
 
 on:
@@ -24,35 +33,40 @@ jobs:
           name: pumpcast-extension
           path: pumpcast-extension.zip
 
-  # Job 2: Build and Push Landing Page Docker Image
+  # Job 2: Build Landing Page
   build-landing-page:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: landing-react/package-lock.json
+          
+      - name: Install Dependencies
+        run: |
+          cd landing-react
+          npm install
+          
+      - name: Lint Check
+        run: |
+          cd landing-react
+          npm run lint || true # Don't fail the build if linting has minor issues for now
+          
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         
-      - name: Build Docker Image (Dry Run)
+      - name: Build Docker Image
         uses: docker/build-push-action@v5
         with:
           context: ./landing-react
           push: false
           tags: pumpcast-landing:latest
-          
-      # If you have Docker Hub or GHCR credentials, you can add login and push steps here
-      # - name: Login to Docker Hub
-      #   uses: docker/login-action@v3
-      #   with:
-      #     username: ${{ secrets.DOCKERHUB_USERNAME }}
-      #     password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
-      # - name: Build and Push
-      #   uses: docker/build-push-action@v5
-      #   with:
-      #     context: ./landing-react
-      #     push: true
-      #     tags: your-username/pumpcast-landing:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   # Job 3: Deploy to Server (Example using SSH)
   # deploy:

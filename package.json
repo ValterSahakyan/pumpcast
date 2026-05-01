@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "check": "node --check server.js && node --check services/dexScreener.js && node --check services/eventDetector.js && node --check services/commentGenerator.js && node --check store/tokenState.js"
+    "check": "node --check server.js && node --check services/dexScreener.js && node --check services/eventDetector.js && node --check services/commentGenerator.js && node --check store/tokenState.js",
+    "sync:extension-config": "node scripts/sync-extension-config.js"
   },
   "keywords": [
     "chrome-extension",

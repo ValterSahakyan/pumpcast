@@ -9,6 +9,7 @@
         "https://pump.fun/coin/*"
       ],
       "js": [
+        "config.js",
         "content.js"
       ],
       "css": [
@@ -42,6 +43,8 @@
   "permissions": [],
   "host_permissions": [
     "https://pump.fun/*",
-    "http://localhost:3001/*"
+    "http://localhost:3001/*",
+    "https://pumpcast.co/*",
+    "https://www.pumpcast.co/*"
   ]
 }

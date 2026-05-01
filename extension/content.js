@@ -1,5 +1,5 @@
 (function pumpcastContentScript() {
-  const BACKEND_URL = "http://localhost:3001";
+  const BACKEND_URL = window.PUMPCAST_CONFIG?.BACKEND_URL || "http://localhost:3001";
   const POLL_INTERVAL_MS = 15000;
   const MAX_HISTORY = 5;
   const MODE_LABELS = {
