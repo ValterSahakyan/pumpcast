@@ -279,6 +279,8 @@ nav {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
+  text-align: center;
 }
 .bento-card.col-span-2 { grid-column: span 2; }
 .bento-card.col-span-3 { grid-column: span 3; padding: 64px 48px; }
@@ -312,10 +314,11 @@ nav {
   border-radius: 20px;
   display: flex; align-items: center; justify-content: center;
   margin-bottom: 24px;
+  margin-inline: auto;
   box-shadow: inset 0 2px 10px rgba(255,255,255,0.05);
 }
 .bento-card h3 { font-size: 28px; margin-bottom: 16px; font-weight: 700; }
-.bento-card p { color: var(--text-dim); font-size: 16px; line-height: 1.6; }
+.bento-card p { color: var(--text-dim); font-size: 16px; line-height: 1.6; max-width: 540px; margin-inline: auto; }
 
 /* How It Works Steps */
 .how-it-works {
@@ -510,23 +513,60 @@ footer { padding: 80px 0 40px; border-top: 1px solid var(--border); background: 
   margin-bottom: 24px;
 }
 
+/* Mobile Responsiveness Improvements */
 @media (max-width: 992px) {
+  .header-spacer { height: 80px; }
+  header { height: 80px; }
+  header.scrolled { height: 70px; }
+  
+  .hero { padding: 60px 0 80px; }
   .hero-container { grid-template-columns: 1fr; text-align: center; gap: 40px; }
   .hero-content { margin: 0 auto; }
+  .hero h1 { font-size: clamp(36px, 8vw, 56px); }
+  .hero-subtitle { font-size: 16px; margin-bottom: 32px; }
+  
   .badge-wrapper { margin: 0 auto 24px; }
-  .mock-widget { transform: none; }
+  .mock-widget { transform: none; max-width: min(380px, 100%); }
   .mock-widget:hover { transform: translateY(-10px); }
   
-  .bento-grid { grid-template-columns: 1fr; }
-  .bento-card.col-span-2, .bento-card.col-span-3 { grid-column: span 1; padding: 40px; }
+  .section-header { margin-bottom: 48px; }
+  .section-header h2 { font-size: 36px; }
   
-  .steps-container { flex-direction: column; gap: 24px; }
-  .step-card { width: 100%; }
+  .bento-grid { grid-template-columns: 1fr; gap: 16px; }
+  .bento-card { padding: 32px !important; }
+  .bento-card.col-span-2, .bento-card.col-span-3 { grid-column: span 1; }
+  .bento-card h3 { font-size: 24px; }
+  
+  .steps-container { flex-direction: column; gap: 20px; padding-top: 20px; }
+  .step-card { width: 100%; padding: 32px 24px; }
   .steps-line { display: none; }
   
-  .footer-content { grid-template-columns: 1fr; gap: 40px; }
+  .footer-content { grid-template-columns: 1fr; gap: 48px; text-align: center; }
+  .footer-brand { display: flex; flex-direction: column; align-items: center; }
+  .footer-brand p { margin: 20px auto 0; }
+  .address-copy-box { margin: 0 auto; }
 }
+
 @media (max-width: 768px) {
   .nav-links { display: none; }
+  nav { grid-template-columns: 1fr auto; }
+  .logo span { font-size: 20px; }
+  .logo img { width: 36px; height: 36px; }
+  .nav-btn { padding: 10px 20px; font-size: 14px; }
+  
   .policy-card { padding: 28px 20px; border-radius: 24px; }
+}
+
+@media (max-width: 480px) {
+  .container { padding: 0 16px; }
+  .hero h1 { font-size: 32px; }
+  .btn-lg { width: 100%; justify-content: center; }
+  .mock-widget { border-radius: 20px; }
+  .mock-widget-header, .mock-widget-body { padding: 16px; }
+  .mock-controls { grid-template-columns: 1fr; }
+  
+  .section-header h2 { font-size: 30px; }
+  .bento-card { padding: 24px !important; border-radius: 24px; }
+  
+  .footer-bottom { padding-top: 32px; }
 }

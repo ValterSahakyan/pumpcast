@@ -318,8 +318,8 @@ function App() {
             </motion.div>
             
             <motion.div variants={fadeInUp} className="bento-card col-span-3">
-              <div className="bento-content text-center">
-                <div className="bento-icon mx-auto">⚡</div>
+              <div className="bento-content">
+                <div className="bento-icon">⚡</div>
                 <h3>Instant Event Detection</h3>
                 <p>Our backend hooks into DexScreener to instantly detect liquidity drops, buy/sell ratios, and rapid price action before the crowd notices.</p>
               </div>
