@@ -130,11 +130,29 @@ jobs:
               docker rm $RUNNING_ON_PORT
             fi
 
+            PORT_PIDS=""
             if command -v lsof >/dev/null 2>&1; then
-              REMAINING_PIDS="$(lsof -ti tcp:${APP_PORT} || true)"
-              if [ -n "$REMAINING_PIDS" ]; then
-                echo "Port ${APP_PORT} is still occupied by host process(es): $REMAINING_PIDS"
-                exit 1
+              PORT_PIDS="$(lsof -ti tcp:${APP_PORT} || true)"
+            elif command -v ss >/dev/null 2>&1; then
+              PORT_PIDS="$(ss -ltnp "( sport = :${APP_PORT} )" 2>/dev/null | awk 'NR > 1 { print $NF }' | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)"
+            fi
+
+            if [ -n "$PORT_PIDS" ]; then
+              echo "Stopping host process(es) using port ${APP_PORT}: $PORT_PIDS"
+              kill $PORT_PIDS || true
+              sleep 2
+
+              STILL_RUNNING=""
+              if command -v lsof >/dev/null 2>&1; then
+                STILL_RUNNING="$(lsof -ti tcp:${APP_PORT} || true)"
+              elif command -v ss >/dev/null 2>&1; then
+                STILL_RUNNING="$(ss -ltnp "( sport = :${APP_PORT} )" 2>/dev/null | awk 'NR > 1 { print $NF }' | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u)"
+              fi
+
+              if [ -n "$STILL_RUNNING" ]; then
+                echo "Force killing remaining process(es) on port ${APP_PORT}: $STILL_RUNNING"
+                kill -9 $STILL_RUNNING || true
+                sleep 1
               fi
             fi
 
