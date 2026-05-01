@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   pumpcast-backend:
     build: .
     container_name: pumpcast-backend
     restart: always
     ports:
-      - "3001:3001"
+      - "3011:3001"
     env_file:
       - .env
     environment:

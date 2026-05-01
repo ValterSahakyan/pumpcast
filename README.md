@@ -55,12 +55,12 @@ npm start
 5. Verify the backend is running:
 
 ```text
-http://localhost:3001/health
+http://localhost:3011/health
 ```
 
 ## Chrome extension setup
 
-1. Open [extension/content.js](/abs/c:/work/pumpcast/extension/content.js) and confirm `BACKEND_URL` points to your backend. By default it is `http://localhost:3001`.
+1. Open [extension/content.js](/abs/c:/work/pumpcast/extension/content.js) and confirm `BACKEND_URL` points to your backend. By default it is `http://localhost:3011`.
 2. Open Chrome and go to `chrome://extensions`.
 3. Enable Developer Mode.
 4. Click `Load unpacked`.

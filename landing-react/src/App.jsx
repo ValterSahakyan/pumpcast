@@ -392,7 +392,6 @@ function App() {
               <ul>
                 <li><a href="https://telegram.me/yogurtsoftware" target="_blank" rel="noreferrer">Telegram</a></li>
                 <li><a href="mailto:hello@pumpcast.co">hello@pumpcast.co</a></li>
-                <li><a href="https://github.com/ValterSahakyan/pumpcast" target="_blank" rel="noreferrer">GitHub</a></li>
                 <li><a href="/privacy-policy">Privacy Policy</a></li>
               </ul>
             </div>

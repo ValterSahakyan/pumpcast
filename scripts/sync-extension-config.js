@@ -5,7 +5,7 @@ const path = require("path");
 const backendUrl = String(
   process.env.EXTENSION_BACKEND_URL ||
     process.env.BACKEND_URL ||
-    "http://localhost:3001"
+    "http://localhost:3011"
 ).trim();
 
 const targetPath = path.join(__dirname, "..", "extension", "config.js");

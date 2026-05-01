@@ -43,7 +43,7 @@
   "permissions": [],
   "host_permissions": [
     "https://pump.fun/*",
-    "http://localhost:3001/*",
+    "http://localhost:3011/*",
     "https://pumpcast.co/*",
     "https://www.pumpcast.co/*"
   ]

@@ -102,6 +102,7 @@ jobs:
           key: ${{ env.SSH_KEY }}
           script: |
             set -e
+            APP_PORT=3011
 
             if [ -d "$HOME/pumpcast" ]; then
               cd "$HOME/pumpcast"
@@ -112,10 +113,29 @@ jobs:
               exit 1
             fi
 
+            # Remove stale Docker containers already publishing the app port.
+            RUNNING_ON_PORT="$(docker ps -q --filter "publish=${APP_PORT}")"
+            if [ -n "$RUNNING_ON_PORT" ]; then
+              echo "Stopping Docker containers using port ${APP_PORT}: $RUNNING_ON_PORT"
+              docker stop $RUNNING_ON_PORT
+              docker rm $RUNNING_ON_PORT
+            fi
+
+            if command -v lsof >/dev/null 2>&1; then
+              REMAINING_PIDS="$(lsof -ti tcp:${APP_PORT} || true)"
+              if [ -n "$REMAINING_PIDS" ]; then
+                echo "Port ${APP_PORT} is still occupied by host process(es): $REMAINING_PIDS"
+                exit 1
+              fi
+            fi
+
+            # Shut down any previous compose stack before recreating it.
             if docker compose version >/dev/null 2>&1; then
+              docker compose down --remove-orphans || true
               docker compose pull
               docker compose up -d --build
             elif command -v docker-compose >/dev/null 2>&1; then
+              docker-compose down --remove-orphans || true
               docker-compose pull
               docker-compose up -d --build
             else
