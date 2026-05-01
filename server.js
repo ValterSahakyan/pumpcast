@@ -45,6 +45,8 @@ app.use(
   })
 );
 app.use(express.json());
+app.use(express.static("landing-react/dist"));
+app.use(express.static("."));
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true });

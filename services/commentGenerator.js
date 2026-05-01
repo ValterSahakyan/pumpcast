@@ -29,13 +29,14 @@ function createUserPrompt({ mode, event, marketData }) {
     `Event type: ${event.type}`,
     `Event reason: ${event.reason}`,
     `Price USD: ${market.priceUsd}`,
+    `Market Cap USD: ${market.marketCap}`,
     `5m price change: ${market.priceChangeM5}%`,
     `1h price change: ${market.priceChangeH1}%`,
     `5m volume: ${market.volumeM5}`,
     `Liquidity USD: ${market.liquidityUsd}`,
     `5m buys: ${market.buysM5}`,
     `5m sells: ${market.sellsM5}`,
-    "Generate one live commentary sentence.",
+    "Generate one live commentary sentence. Talk about the chart moving, mention casual $20-$50 buys happening, or reference the pump.fun bonding curve progress (it completes around $69k market cap).",
   ].join("\n");
 }
 
@@ -69,6 +70,7 @@ function fallbackComment({ mode, event, marketData }) {
       liquidity_low: `Warning: ${symbol} has low liquidity, so price movement may be unstable.`,
       liquidity_warning: `${symbol} just saw a sharp liquidity drop, and the track could get slippery fast.`,
       quiet_market: `${symbol} is circling quietly right now, with muted price action and light traffic.`,
+      chart_update: `Looking at the board, ${symbol} is sitting at a ${market.marketCap ? '$' + Math.round(market.marketCap / 1000) + 'k' : 'steady'} market cap.`,
     },
     pro: {
       extreme_pump: `${symbol} is showing extreme short-term momentum, up ${market.priceChangeM5.toFixed(1)}% in five minutes with heavy activity.`,
@@ -81,6 +83,7 @@ function fallbackComment({ mode, event, marketData }) {
       liquidity_low: `Warning: ${symbol} has low liquidity, which can increase short-term instability.`,
       liquidity_warning: `${symbol} just lost a meaningful share of liquidity, increasing execution risk.`,
       quiet_market: `${symbol} is relatively quiet, with muted movement and low short-term activity.`,
+      chart_update: `Current valuation for ${symbol} is roughly ${market.marketCap ? '$' + Math.round(market.marketCap / 1000) + 'k' : 'stable'}, with normal market flow.`,
     },
     risk: {
       dump: `Warning: ${symbol} is down ${absChange}% in five minutes as selling pressure increases.`,

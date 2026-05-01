@@ -1,0 +1,26 @@
+name: Extension Build
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'extension/**'
+      - '.github/workflows/extension.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Zip extension
+        run: |
+          cd extension
+          zip -r ../pumpcast-extension.zip .
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pumpcast-extension
+          path: pumpcast-extension.zip

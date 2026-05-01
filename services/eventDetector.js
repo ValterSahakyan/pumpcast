@@ -1,8 +1,9 @@
-const COMMENT_COOLDOWN_MS = 30 * 1000;
-const QUIET_MARKET_INTERVAL_MS = 4 * 60 * 1000;
+const COMMENT_COOLDOWN_MS = 20 * 1000;
+const QUIET_MARKET_INTERVAL_MS = 45 * 1000;
 
 const EVENT_PRIORITY = {
   quiet_market: 1,
+  chart_update: 2,
   buyers_control: 2,
   sellers_control: 2,
   volume_spike: 2,
@@ -142,15 +143,13 @@ function detectCandidateEvents({ marketData, previousState }) {
   }
 
   if (
-    Math.abs(market.priceChangeM5) < 3 &&
-    totalTxns < 25 &&
     (!previousState?.lastCommentAt ||
       Date.now() - previousState.lastCommentAt >= QUIET_MARKET_INTERVAL_MS)
   ) {
     events.push(
       buildEvent(
-        "quiet_market",
-        "Price action and transaction flow are muted right now."
+        "chart_update",
+        `Regular chart update. Provide commentary on current token data.`
       )
     );
   }
