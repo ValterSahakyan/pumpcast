@@ -7,13 +7,10 @@
 # 4. DOCKERHUB_USERNAME: Your Docker Hub username (if pushing)
 # 5. DOCKERHUB_TOKEN: Your Docker Hub access token (if pushing)
 
-name: CI/CD Pipeline
+name: Legacy Manual CI/CD
 
 on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
   # Job 1: Build and Package the Extension
