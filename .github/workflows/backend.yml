@@ -101,6 +101,24 @@ jobs:
           username: ${{ env.SSH_USER }}
           key: ${{ env.SSH_KEY }}
           script: |
-            cd ~/pumpcast
-            docker-compose pull
-            docker-compose up -d
+            set -e
+
+            if [ -d "$HOME/pumpcast" ]; then
+              cd "$HOME/pumpcast"
+            elif [ -d "/var/www/pumpcast" ]; then
+              cd "/var/www/pumpcast"
+            else
+              echo "Deploy directory not found. Expected $HOME/pumpcast or /var/www/pumpcast."
+              exit 1
+            fi
+
+            if docker compose version >/dev/null 2>&1; then
+              docker compose pull
+              docker compose up -d --build
+            elif command -v docker-compose >/dev/null 2>&1; then
+              docker-compose pull
+              docker-compose up -d --build
+            else
+              echo "Neither 'docker compose' nor 'docker-compose' is installed on the server."
+              exit 1
+            fi
