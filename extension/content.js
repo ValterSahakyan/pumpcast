@@ -8,6 +8,7 @@
     risk: "Risk Mode",
   };
 
+  
   let widgetRoot = null;
   let currentAddress = null;
   let isWatching = false;
