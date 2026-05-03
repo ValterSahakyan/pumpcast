@@ -25,9 +25,6 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  BACKEND_IMAGE: ghcr.io/${{ github.repository }}-backend
-  LANDING_IMAGE: ghcr.io/${{ github.repository }}-landing
-  ADMIN_IMAGE: ghcr.io/${{ github.repository }}-admin
 
 jobs:
   verify:
@@ -92,6 +89,13 @@ jobs:
       - name: Set image tags
         id: tags
         run: |
+          REPO_LC="$(echo "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')"
+          BACKEND_IMAGE="${REGISTRY}/${REPO_LC}-backend"
+          LANDING_IMAGE="${REGISTRY}/${REPO_LC}-landing"
+          ADMIN_IMAGE="${REGISTRY}/${REPO_LC}-admin"
+          echo "backend_image=${BACKEND_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "landing_image=${LANDING_IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "admin_image=${ADMIN_IMAGE}" >> "$GITHUB_OUTPUT"
           echo "backend_tag=${BACKEND_IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "landing_tag=${LANDING_IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "admin_tag=${ADMIN_IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
@@ -107,7 +111,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.tags.outputs.backend_tag }}
-            ${{ env.BACKEND_IMAGE }}:latest
+            ${{ steps.tags.outputs.backend_image }}:latest
           cache-from: type=gha,scope=backend
           cache-to: type=gha,mode=max,scope=backend
 
@@ -119,7 +123,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.tags.outputs.landing_tag }}
-            ${{ env.LANDING_IMAGE }}:latest
+            ${{ steps.tags.outputs.landing_image }}:latest
           cache-from: type=gha,scope=landing
           cache-to: type=gha,mode=max,scope=landing
 
@@ -131,7 +135,7 @@ jobs:
           push: true
           tags: |
             ${{ steps.tags.outputs.admin_tag }}
-            ${{ env.ADMIN_IMAGE }}:latest
+            ${{ steps.tags.outputs.admin_image }}:latest
           cache-from: type=gha,scope=admin
           cache-to: type=gha,mode=max,scope=admin
 
