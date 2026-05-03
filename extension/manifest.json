@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "PumpCast AI",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Adds a live AI commentator overlay to pump.fun coin pages.",
   "content_scripts": [
     {
@@ -43,8 +43,6 @@
   "permissions": [],
   "host_permissions": [
     "https://pump.fun/*",
-    "http://localhost:3001/*",
-    "http://localhost:3001/api/*",
     "https://pumpcast.co/*",
     "https://www.pumpcast.co/*"
   ]

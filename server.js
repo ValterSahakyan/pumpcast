@@ -110,8 +110,11 @@ app.get("/api/ads", async (req, res) => {
   }
 });
 
+// Admin routes allow any origin — requireAdmin (wallet check) is the security boundary
+const adminCors = cors({ origin: true, allowedHeaders: ["Content-Type", "Authorization"], methods: ["GET", "POST", "OPTIONS"] });
+
 // Admin: all ads including inactive
-app.get("/api/admin/ads", requireAdmin, async (req, res) => {
+app.get("/api/admin/ads", adminCors, requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(
       "SELECT * FROM ads ORDER BY sort_order ASC, id ASC"
@@ -124,7 +127,7 @@ app.get("/api/admin/ads", requireAdmin, async (req, res) => {
 });
 
 // Admin: replace all ads atomically
-app.post("/api/admin/ads", requireAdmin, async (req, res) => {
+app.post("/api/admin/ads", adminCors, requireAdmin, async (req, res) => {
   const { ads } = req.body || {};
   if (!Array.isArray(ads)) {
     return res.status(400).json({ success: false, error: "ads must be an array" });
@@ -179,7 +182,7 @@ app.get("/api/token", async (req, res) => {
 });
 
 // Admin: save token config
-app.post("/api/admin/token", requireAdmin, async (req, res) => {
+app.post("/api/admin/token", adminCors, requireAdmin, async (req, res) => {
   try {
     const {
       symbol = "",
