@@ -18,7 +18,7 @@ services:
       - pumpcast-network
 
   backend:
-    image: ${BACKEND_IMAGE:-pumpcast-backend}
+    image: ${BACKEND_IMAGE:-ghcr.io/valtersahakyan/pumpcast-backend:latest}
     restart: unless-stopped
     pull_policy: always
     environment:
@@ -42,14 +42,14 @@ services:
       - pumpcast-network
 
   landing:
-    image: ${LANDING_IMAGE:-pumpcast-landing}
+    image: ${LANDING_IMAGE:-ghcr.io/valtersahakyan/pumpcast-landing:latest}
     restart: unless-stopped
     pull_policy: always
     networks:
       - pumpcast-network
 
   admin:
-    image: ${ADMIN_IMAGE:-pumpcast-admin}
+    image: ${ADMIN_IMAGE:-ghcr.io/valtersahakyan/pumpcast-admin:latest}
     restart: unless-stopped
     pull_policy: always
     networks:

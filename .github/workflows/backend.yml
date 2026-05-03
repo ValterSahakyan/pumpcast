@@ -193,10 +193,13 @@ jobs:
 
             echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-            export BACKEND_IMAGE='${{ needs.build-and-push.outputs.backend_tag }}'
-            export LANDING_IMAGE='${{ needs.build-and-push.outputs.landing_tag }}'
-            export ADMIN_IMAGE='${{ needs.build-and-push.outputs.admin_tag }}'
+            cat > .deploy-images.env <<EOF
+            BACKEND_IMAGE=${{ needs.build-and-push.outputs.backend_tag }}
+            LANDING_IMAGE=${{ needs.build-and-push.outputs.landing_tag }}
+            ADMIN_IMAGE=${{ needs.build-and-push.outputs.admin_tag }}
+            EOF
 
-            docker compose pull
-            docker compose up -d --remove-orphans
+            docker compose --env-file .env --env-file .deploy-images.env pull
+            docker compose --env-file .env --env-file .deploy-images.env up -d --remove-orphans
+            rm -f .deploy-images.env
             docker image prune -f
