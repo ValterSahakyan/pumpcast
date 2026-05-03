@@ -3,7 +3,7 @@ import { BrowserProvider } from 'ethers';
 import './App.css';
 
 const ADMIN_WALLET = '0xd21760A4ad624d15ee37570B3C09Fd3Bff489309'.toLowerCase();
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+const API_URL = ''; // Use relative paths for reverse proxy support
 
 function App() {
   const [wallet, setWallet] = useState('');
@@ -54,8 +54,11 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/api/admin/ads`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ walletAddress: wallet, ads })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': wallet
+        },
+        body: JSON.stringify({ ads })
       });
       const data = await res.json();
       if (data.success) {

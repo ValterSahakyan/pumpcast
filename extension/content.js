@@ -1,5 +1,5 @@
 (function pumpcastContentScript() {
-  const BACKEND_URL = window.PUMPCAST_CONFIG?.BACKEND_URL || "http://localhost:3011";
+  const BACKEND_URL = window.PUMPCAST_CONFIG?.BACKEND_URL || "http://localhost:3001";
   const POLL_INTERVAL_MS = 15000;
   const MAX_HISTORY = 5;
   const MODE_LABELS = {
@@ -240,18 +240,25 @@
     try {
       const requestUrl =
         `${BACKEND_URL}/api/commentator?address=${encodeURIComponent(currentAddress)}&mode=${encodeURIComponent(currentMode)}`;
+      
       const result = await chrome.runtime.sendMessage({
         type: "pumpcast:fetchCommentary",
         url: requestUrl,
+      }).catch(err => {
+        // Handle common Chrome error when extension is reloaded but page is not
+        if (err.message?.includes("Extension context invalidated")) {
+          return { success: false, error: "Extension updated. Please refresh the page." };
+        }
+        return { success: false, error: err.message || "Failed to communicate with background script." };
       });
 
-      if (!result?.success) {
+      if (!result || !result.success) {
         throw new Error(result?.error || "Backend request failed.");
       }
 
       const payload = result.payload;
-      if (!payload?.success) {
-        throw new Error(payload?.error || "Backend request failed.");
+      if (!payload) {
+        throw new Error("No data received from backend.");
       }
 
       if (payload.token) {
@@ -274,7 +281,10 @@
       updateStatus(isSpeaking ? "Speaking" : "Watching");
     } catch (error) {
       console.error("Pumpcast polling error:", error);
-      updateStatus("Error", error.message);
+      // Don't show "No meaningful market event detected" as an error
+      if (error.message !== "No meaningful market event detected.") {
+        updateStatus("Error", error.message);
+      }
     }
   }
 

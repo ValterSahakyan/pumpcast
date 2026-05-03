@@ -461,6 +461,7 @@
   overflow: hidden;
   border: 1px solid var(--pumpcast-border-accent);
   width: 100%;
+  flex-shrink: 0;
 }
 
 #pumpcast-widget .pumpcast-ad-track {
@@ -517,6 +518,7 @@
   gap: 3px;
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 #pumpcast-widget .pumpcast-ad-badge {
@@ -532,6 +534,7 @@
 }
 
 #pumpcast-widget .pumpcast-ad-title {
+  display: block;
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -542,6 +545,7 @@
 }
 
 #pumpcast-widget .pumpcast-ad-desc {
+  display: block;
   color: var(--pumpcast-text-secondary);
   font-size: 10px;
   white-space: nowrap;
