@@ -76,6 +76,23 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+function clampText(value, maxLength) {
+  return String(value || "").trim().slice(0, maxLength);
+}
+
+function normalizeAd(ad, index) {
+  return {
+    image: String(ad?.image || "").trim(),
+    badge: clampText(ad?.badge, 50),
+    title: clampText(ad?.title, 255),
+    desc: String(ad?.desc || "").trim(),
+    link: String(ad?.link || "").trim(),
+    accent: clampText(ad?.accent || "#FF6A00", 50) || "#FF6A00",
+    active: ad?.active !== false,
+    sortOrder: index,
+  };
+}
+
 // Public: only active ads for the extension
 app.get("/api/ads", async (req, res) => {
   try {
@@ -104,40 +121,45 @@ app.get("/api/admin/ads", requireAdmin, async (req, res) => {
 
 // Admin: replace all ads atomically
 app.post("/api/admin/ads", requireAdmin, async (req, res) => {
-  const { ads } = req.body;
+  const { ads } = req.body || {};
   if (!Array.isArray(ads)) {
     return res.status(400).json({ success: false, error: "ads must be an array" });
   }
 
-  const client = await pool.connect();
+  const normalizedAds = ads.map(normalizeAd);
+  let client;
   try {
+    client = await pool.connect();
     await client.query("BEGIN");
     await client.query("DELETE FROM ads");
-    for (let i = 0; i < ads.length; i++) {
-      const ad = ads[i];
+    for (const ad of normalizedAds) {
       await client.query(
         `INSERT INTO ads (image, badge, title, "desc", link, accent, active, sort_order)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [
-          ad.image  || "",
-          ad.badge  || "",
-          ad.title  || "",
-          ad.desc   || "",
-          ad.link   || "",
-          ad.accent || "#FF6A00",
-          ad.active !== false,
-          i,
+          ad.image,
+          ad.badge,
+          ad.title,
+          ad.desc,
+          ad.link,
+          ad.accent,
+          ad.active,
+          ad.sortOrder,
         ]
       );
     }
     await client.query("COMMIT");
     res.json({ success: true });
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
+    if (client) {
+      await client.query("ROLLBACK").catch(() => {});
+    }
     console.error("POST /api/admin/ads:", err.message);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: `Failed to save ads: ${err.message}` });
   } finally {
-    client.release();
+    if (client) {
+      client.release();
+    }
   }
 });
 
