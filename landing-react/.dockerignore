@@ -4,6 +4,5 @@ dist
 .git
 .github
 Dockerfile
-nginx.conf
 .env
 README.md
