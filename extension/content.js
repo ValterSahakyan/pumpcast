@@ -356,7 +356,7 @@
       badge: "ADVERTISE",
       title: "Your Ad Here 🚀",
       desc: "Reach thousands of pump.fun traders.",
-      link: "https://telegram.me/yogurtsoftware",
+      link: "https://t.me/pumpcastco",
       accent: "#FF6A00",
     },
     {
@@ -364,7 +364,7 @@
       badge: "SPONSOR",
       title: "Place Your Banner",
       desc: "High-visibility slot inside every widget.",
-      link: "https://telegram.me/yogurtsoftware",
+      link: "https://t.me/pumpcastco",
       accent: "#6366F1",
     },
   ];
@@ -504,7 +504,7 @@
           <span>&bull;</span>
           <a href="https://x.com/pump_cast_ai" target="_blank">X</a>
           <span>&bull;</span>
-          <a href="https://telegram.me/yogurtsoftware" target="_blank">Telegram</a>
+          <a href="https://t.me/pumpcastco" target="_blank">Telegram</a>
           ${PCAST_TOKEN_ADDRESS ? `<span>&bull;</span><a href="https://pump.fun/coin/${PCAST_TOKEN_ADDRESS}" target="_blank" class="pumpcast-footer-token-link"><img src="${LOGO_URL}" style="width:12px;height:12px;object-fit:contain;vertical-align:middle;margin-top:-2px;margin-right:2px;" /> $PCAST</a>` : ''}
         </div>
       </div>
