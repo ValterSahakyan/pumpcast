@@ -359,7 +359,7 @@ async function start() {
   try {
     await initDb();
   } catch (err) {
-    console.error("Database initialization failed:", err.message);
+    console.error("Database initialization failed:", err?.message || err);
     process.exit(1);
   }
 

@@ -707,7 +707,7 @@ export default function Admin() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 780, margin: '0 auto', padding: '32px 24px' }}>
+      <div style={{ width: '100%', maxWidth: 1180, margin: '0 auto', padding: '32px 24px 48px' }}>
         <div style={{ marginBottom: 40 }}>
           <div style={{ marginBottom: 20 }}>
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: '0 0 4px' }}>Token Config</h1>
