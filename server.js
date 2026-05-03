@@ -59,7 +59,7 @@ app.use(
     },
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 const ADMIN_WALLET = (
   process.env.ADMIN_WALLET || "0xd21760a4ad624d15ee37570b3c09fd3bff489309"
@@ -342,10 +342,21 @@ app.get("/api/commentator", async (req, res) => {
 });
 
 app.use((error, _req, res, _next) => {
-  console.error("Unhandled error:", error);
+  console.error("Unhandled middleware error:", error);
+
+  // Body parser error (invalid JSON or wrong Content-Type)
+  if (error.type === "entity.parse.failed" || error instanceof SyntaxError) {
+    return res.status(400).json({ success: false, error: "Invalid JSON in request body." });
+  }
+
+  // CORS rejection
+  if (error.message && error.message.toLowerCase().includes("cors")) {
+    return res.status(403).json({ success: false, error: `CORS error: ${error.message}` });
+  }
+
   res.status(500).json({
     success: false,
-    error: "Unexpected server error.",
+    error: error.message || "Unexpected server error.",
   });
 });
 
