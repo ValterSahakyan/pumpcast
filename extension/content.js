@@ -416,6 +416,65 @@
     });
   }
 
+  function createAdItem(ad, index, count) {
+    const accent = ad.accent || "#FF6A00";
+    const item = document.createElement("a");
+    item.className = "pumpcast-ad-item";
+    item.style.flex = `0 0 ${(100 / count).toFixed(4)}%`;
+    item.href = ad.link || "#";
+    item.target = "_blank";
+    item.rel = "noreferrer";
+    if (!ad.link) {
+      item.addEventListener("click", (e) => e.preventDefault());
+    }
+
+    if (ad.image) {
+      const thumb = document.createElement("div");
+      thumb.className = "pumpcast-ad-thumb";
+      const img = document.createElement("img");
+      img.className = "pumpcast-ad-img";
+      img.alt = ad.title || "";
+      img.src = ad.image;
+      img.addEventListener("load", () => {
+        if (widgetRoot) scheduleFitAdDescriptions(widgetRoot);
+      });
+      thumb.appendChild(img);
+      item.appendChild(thumb);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "pumpcast-ad-thumb-placeholder";
+      placeholder.style.background = `${accent}18`;
+      placeholder.style.borderColor = `${accent}44`;
+      item.appendChild(placeholder);
+    }
+
+    const body = document.createElement("div");
+    body.className = "pumpcast-ad-body";
+
+    const badge = document.createElement("span");
+    badge.className = "pumpcast-ad-badge";
+    badge.style.color = accent;
+    badge.style.background = `${accent}18`;
+    badge.style.borderColor = `${accent}44`;
+    badge.textContent = ad.badge || "AD";
+
+    const title = document.createElement("span");
+    title.className = "pumpcast-ad-title";
+    title.textContent = ad.title || "Your Ad Here";
+
+    const desc = document.createElement("span");
+    desc.className = "pumpcast-ad-desc";
+    desc.dataset.fullText = String(ad.desc || "Click to learn more");
+    desc.textContent = desc.dataset.fullText;
+
+    body.appendChild(badge);
+    body.appendChild(title);
+    body.appendChild(desc);
+    item.appendChild(body);
+
+    return item;
+  }
+
   function injectWidget() {
     if (!isPumpFunCoinPage() || document.getElementById("pumpcast-widget")) {
       return;
@@ -664,27 +723,7 @@
       track.style.width = `${n * 100}%`;
 
       ADS.forEach((ad, index) => {
-        const accent = ad.accent || "#FF6A00";
-        const item = document.createElement("a");
-        item.className = "pumpcast-ad-item";
-        item.style.flex = `0 0 ${(100 / n).toFixed(4)}%`;
-        item.href = ad.link || "#";
-        item.target = "_blank";
-        item.rel = "noreferrer";
-        if (!ad.link) item.addEventListener("click", e => e.preventDefault());
-
-        const thumb = ad.image
-          ? `<div class="pumpcast-ad-thumb"><img src="${ad.image}" alt="${ad.title || ''}" class="pumpcast-ad-img" /></div>`
-          : `<div class="pumpcast-ad-thumb-placeholder" style="background:${accent}18;border-color:${accent}44;"></div>`;
-
-        item.innerHTML = `
-          ${thumb}
-          <div class="pumpcast-ad-body">
-            <span class="pumpcast-ad-badge" style="color:${accent};background:${accent}18;border-color:${accent}44;">${ad.badge || "AD"}</span>
-            <span class="pumpcast-ad-title">${ad.title || "Your Ad Here"}</span>
-            <span class="pumpcast-ad-desc" data-full-text="${String(ad.desc || "Click to learn more").replace(/"/g, "&quot;")}">${ad.desc || "Click to learn more"}</span>
-          </div>
-        `;
+        const item = createAdItem(ad, index, n);
         track.appendChild(item);
 
         if (n > 1) {
@@ -718,6 +757,8 @@
       }
 
       scheduleFitAdDescriptions(root);
+      setTimeout(() => scheduleFitAdDescriptions(root), 120);
+      setTimeout(() => scheduleFitAdDescriptions(root), 400);
     }
 
     // Fetch ads via background service worker. Show defaults immediately so the
