@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import './index.css'
-import Admin from './Admin'
 
 // ─── Ad Slider ────────────────────────────────────────────────────────────────
 
@@ -239,7 +238,6 @@ function App() {
   const [activeVoice, setActiveVoice] = useState('godmode')
   const [tokenConfig, setTokenConfig] = useState(null)
   const isPrivacyPolicyPage = window.location.pathname === '/privacy-policy'
-  const isAdminPage = window.location.pathname === '/admin'
 
   useEffect(() => {
     fetch('/api/token')
@@ -307,7 +305,6 @@ function App() {
   };
 
   if (isPrivacyPolicyPage) return <PrivacyPolicyPage />
-  if (isAdminPage) return <Admin />
 
   return (
     <div className="app-wrapper">
