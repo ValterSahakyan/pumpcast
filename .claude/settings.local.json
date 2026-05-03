@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker compose *)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :5432)",
+      "Bash(tasklist /fi \"PID eq 18960\")",
+      "Bash(tasklist /fi \"PID eq 22176\")",
+      "PowerShell(Get-Process -Id 18960, 22176)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 5432 | Select-Object LocalPort, OwningProcess | Get-Unique; Get-Process -Id \\(Get-NetTCPConnection -LocalPort 5432 | Select-Object -ExpandProperty OwningProcess -Unique\\) | Select-Object Id, ProcessName 2>$null)",
+      "PowerShell(\\(Get-Process -Id 22176 -ErrorAction SilentlyContinue\\).ProcessName; \\(Get-Process -Id 18960 -ErrorAction SilentlyContinue\\).ProcessName)",
+      "Bash(npm run *)",
+      "PowerShell(5430..5440 | Where-Object { -not \\(Get-NetTCPConnection -LocalPort $_ -ErrorAction SilentlyContinue\\) } | Select-Object -First 1)",
+      "Read(//c/Users/User/.claude/skills/ui-ux-pro-max/**)",
+      "Bash(python3 scripts/search.py \"crypto trading dark landing page carousel slider ads\" --design-system -f markdown)",
+      "Bash(python scripts/search.py \"crypto trading dark landing page\" --design-system -f markdown)",
+      "Bash(curl -s http://localhost:3001/api/token)",
+      "Bash(docker builder *)",
+      "Bash(taskkill /PID 22744 /F)",
+      "PowerShell(Stop-Process -Id 22744 -Force)",
+      "Bash(curl -s http://localhost:3001/)"
+    ]
+  }
+}

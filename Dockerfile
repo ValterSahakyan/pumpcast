@@ -1,25 +1,10 @@
-FROM node:20-alpine AS landing-build
+FROM node:18-alpine
 
-WORKDIR /build/landing-react
-
-COPY landing-react/package*.json ./
-RUN npm install
-
-COPY landing-react/ ./
-RUN npm run build
-
-FROM node:20-alpine
-
-WORKDIR /usr/src/app
+WORKDIR /app
 
 COPY package*.json ./
-RUN npm install --omit=dev
+RUN npm install
 
-COPY server.js ./
-COPY services ./services
-COPY store ./store
-COPY --from=landing-build /build/landing-react/dist ./landing-react/dist
-
-EXPOSE 3001
+COPY . .
 
 CMD ["npm", "start"]

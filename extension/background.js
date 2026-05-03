@@ -3,7 +3,7 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "pumpcast:fetchCommentary") {
+  if (message?.type !== "pumpcast:fetchCommentary" && message?.type !== "pumpcast:fetchAds") {
     return undefined;
   }
 

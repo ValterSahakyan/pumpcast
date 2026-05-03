@@ -1,12 +1,26 @@
+version: '3.8'
+
 services:
-  pumpcast-backend:
-    build: .
-    container_name: pumpcast-backend
-    restart: always
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: pumpcast
     ports:
-      - "3011:3001"
-    env_file:
-      - .env
+      - "5430:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: .
     environment:
       - PORT=3001
-      - NODE_ENV=production
+      - DATABASE_URL=postgres://admin:adminpassword@postgres:5432/pumpcast
+    ports:
+      - "3001:3001"
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:

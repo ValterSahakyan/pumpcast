@@ -18,6 +18,7 @@
   bottom: 24px;
   z-index: 2147483647;
   width: 360px;
+  max-height: calc(100vh - 48px);
   color: var(--pumpcast-text-primary);
   background: var(--pumpcast-bg);
   backdrop-filter: blur(24px) saturate(180%);
@@ -29,6 +30,8 @@
     inset 0 1px 1px rgba(255, 255, 255, 0.1);
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   animation: pumpcast-slide-in 0.6s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -136,6 +139,8 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 #pumpcast-widget .pumpcast-info-row {
@@ -450,51 +455,126 @@
   transform: translateX(4px);
 }
 
-#pumpcast-widget .pumpcast-ad-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: linear-gradient(90deg, rgba(255, 106, 0, 0.15) 0%, rgba(255, 106, 0, 0.05) 100%);
-  border: 1px solid var(--pumpcast-border-accent);
+#pumpcast-widget .pumpcast-ad-slider {
+  position: relative;
   border-radius: 12px;
-  padding: 10px 12px;
-  text-decoration: none;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-  cursor: pointer;
+  overflow: hidden;
+  border: 1px solid var(--pumpcast-border-accent);
+  width: 100%;
 }
 
-#pumpcast-widget .pumpcast-ad-banner:hover {
-  background: linear-gradient(90deg, rgba(255, 106, 0, 0.25) 0%, rgba(255, 106, 0, 0.1) 100%);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 106, 0, 0.15);
+#pumpcast-widget .pumpcast-ad-track {
+  display: flex;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+  width: 100%;
+}
+
+#pumpcast-widget .pumpcast-ad-item {
+  flex: 0 0 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  text-decoration: none;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.02);
+  transition: background 0.2s;
+  min-height: 68px;
+  box-sizing: border-box;
+}
+
+#pumpcast-widget .pumpcast-ad-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+#pumpcast-widget .pumpcast-ad-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+#pumpcast-widget .pumpcast-ad-thumb-placeholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+#pumpcast-widget .pumpcast-ad-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+#pumpcast-widget .pumpcast-ad-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
 }
 
 #pumpcast-widget .pumpcast-ad-badge {
-  background: var(--pumpcast-accent);
-  color: #fff;
-  font-size: 9px;
+  display: inline-block;
+  font-size: 8px;
   font-weight: 800;
   padding: 2px 6px;
   border-radius: 4px;
-  letter-spacing: 0.05em;
-}
-
-#pumpcast-widget .pumpcast-ad-content {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  border: 1px solid transparent;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  width: fit-content;
 }
 
 #pumpcast-widget .pumpcast-ad-title {
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
 
 #pumpcast-widget .pumpcast-ad-desc {
   color: var(--pumpcast-text-secondary);
-  font-size: 11px;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
 }
+
+#pumpcast-widget .pumpcast-ad-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  padding: 6px 0 4px;
+  background: rgba(0,0,0,0.15);
+}
+
+#pumpcast-widget .pumpcast-ad-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  padding: 0;
+}
+
+#pumpcast-widget .pumpcast-ad-dot.active {
+  background: var(--pumpcast-accent);
+  width: 14px;
+  border-radius: 2px;
+}
+
 
 #pumpcast-widget .pumpcast-error-msg {
   background: rgba(255, 77, 77, 0.1);
@@ -507,61 +587,74 @@
 }
 
 #pumpcast-widget .pumpcast-donation-section {
-  margin-top: 8px;
-  padding: 16px;
-  background: linear-gradient(135deg, rgba(255, 106, 0, 0.1), rgba(255, 106, 0, 0.05));
-  border: 1px dashed var(--pumpcast-border-accent);
-  border-radius: 16px;
+  margin-top: 4px;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 106, 0, 0.06);
+  border-left: 2px solid var(--pumpcast-accent);
+  border-radius: 8px;
 }
 
 #pumpcast-widget .pumpcast-donation-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 10px;
   font-weight: 700;
   color: var(--pumpcast-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+#pumpcast-widget .pumpcast-donation-header svg {
+  flex-shrink: 0;
 }
 
 #pumpcast-widget .pumpcast-donation-text {
-  font-size: 11px;
-  color: var(--pumpcast-text-secondary);
-  line-height: 1.4;
+  display: none;
 }
 
 #pumpcast-widget .pumpcast-address-box {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(0, 0, 0, 0.3);
-  padding: 8px 12px;
-  border-radius: 10px;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 5px 8px;
+  border-radius: 6px;
   border: 1px solid var(--pumpcast-border);
   cursor: pointer;
   transition: all 0.2s;
+  flex: 1;
+  min-width: 0;
 }
 
 #pumpcast-widget .pumpcast-address-box:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 106, 0, 0.1);
   border-color: var(--pumpcast-accent);
 }
 
 #pumpcast-widget .pumpcast-address-text {
   font-family: 'Inter', monospace;
-  font-size: 11px;
-  color: #E2E8F0;
+  font-size: 10px;
+  color: var(--pumpcast-text-secondary);
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+#pumpcast-widget .pumpcast-address-box:hover .pumpcast-address-text {
+  color: #E2E8F0;
+}
+
 #pumpcast-widget .pumpcast-copy-icon {
   color: var(--pumpcast-text-secondary);
+  flex-shrink: 0;
   transition: color 0.2s;
 }
 
@@ -571,17 +664,18 @@
 
 #pumpcast-widget .pumpcast-copy-feedback {
   position: absolute;
-  top: -30px;
+  top: -28px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--pumpcast-success);
   color: #000;
-  padding: 4px 10px;
-  border-radius: 6px;
-  font-size: 10px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 9px;
   font-weight: 800;
   opacity: 0;
   pointer-events: none;
+  white-space: nowrap;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -610,21 +704,217 @@
   color: var(--pumpcast-accent);
 }
 
+#pumpcast-widget .pumpcast-footer-token-link {
+  color: var(--pumpcast-success) !important;
+  font-weight: 700;
+}
+
+#pumpcast-widget .pumpcast-footer-token-link:hover {
+  color: #fff !important;
+}
+
+/* Token launch banner */
+#pumpcast-widget .pumpcast-token-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(90deg, rgba(0, 255, 163, 0.12) 0%, rgba(0, 255, 163, 0.04) 100%);
+  border: 1px solid rgba(0, 255, 163, 0.25);
+  border-radius: 12px;
+  padding: 10px 12px;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+#pumpcast-widget .pumpcast-token-banner:hover {
+  background: linear-gradient(90deg, rgba(0, 255, 163, 0.2) 0%, rgba(0, 255, 163, 0.08) 100%);
+  border-color: rgba(0, 255, 163, 0.45);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 255, 163, 0.12);
+}
+
+#pumpcast-widget .pumpcast-token-banner-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+#pumpcast-widget .pumpcast-token-banner-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+#pumpcast-widget .pumpcast-token-banner-title {
+  color: var(--pumpcast-success);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#pumpcast-widget .pumpcast-token-banner-desc {
+  color: var(--pumpcast-text-secondary);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#pumpcast-widget .pumpcast-token-banner-arrow {
+  color: var(--pumpcast-success);
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+#pumpcast-widget .pumpcast-token-banner:hover .pumpcast-token-banner-arrow {
+  opacity: 1;
+  transform: translateX(3px);
+}
+
 #pumpcast-widget.collapsed {
   width: 300px;
   height: 88px;
+  max-height: 88px;
 }
 
 #pumpcast-widget.collapsed .pumpcast-body {
   display: none;
 }
 
-@media (max-width: 640px) {
-  #pumpcast-widget {
-    right: 12px;
-    bottom: 12px;
-    width: calc(100vw - 24px);
-    max-width: 360px;
+/* --- Laptop / medium screens (≤1366px wide or ≤768px tall) --- */
+@media (max-width: 1366px), (max-height: 768px) {
+  #pumpcast-widget.pumpcast-widget {
+    width: 320px;
+    right: 16px;
+    bottom: 16px;
+    max-height: calc(100vh - 32px);
+    --pumpcast-radius: 18px;
+  }
+
+  #pumpcast-widget .pumpcast-header {
+    padding: 14px 16px;
+  }
+
+  #pumpcast-widget .pumpcast-logo-container {
+    width: 48px;
+    height: 48px;
+  }
+
+  #pumpcast-widget .pumpcast-title {
+    font-size: 15px;
+  }
+
+  #pumpcast-widget .pumpcast-body {
+    padding: 14px 16px;
+    gap: 12px;
+  }
+
+  #pumpcast-widget .pumpcast-history-list {
+    max-height: 70px;
+  }
+
+  #pumpcast-widget .pumpcast-commentary-box {
+    padding: 12px;
+    min-height: 60px;
+  }
+
+  #pumpcast-widget .pumpcast-donation-section {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  #pumpcast-widget .btn {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  #pumpcast-widget select {
+    height: 38px;
+    font-size: 12px;
+    padding: 8px 30px 8px 12px;
+  }
+
+  #pumpcast-widget .pumpcast-toggle-wrapper {
+    height: 38px;
+  }
+
+  #pumpcast-widget.collapsed {
+    width: 260px;
+    height: 80px;
+    max-height: 80px;
   }
 }
 
+/* --- Small laptops / compact screens (≤1024px wide) --- */
+@media (max-width: 1024px) {
+  #pumpcast-widget.pumpcast-widget {
+    width: 300px;
+    right: 12px;
+    bottom: 12px;
+  }
+
+  #pumpcast-widget .pumpcast-logo-container {
+    width: 40px;
+    height: 40px;
+  }
+
+  #pumpcast-widget .pumpcast-title {
+    font-size: 14px;
+  }
+
+  #pumpcast-widget .pumpcast-eyebrow {
+    font-size: 9px;
+  }
+
+  #pumpcast-widget .pumpcast-body {
+    padding: 12px 14px;
+    gap: 10px;
+  }
+
+  #pumpcast-widget .pumpcast-controls-grid {
+    gap: 8px;
+  }
+
+  #pumpcast-widget .pumpcast-latest-text {
+    font-size: 13px;
+  }
+
+  #pumpcast-widget .pumpcast-donation-section {
+    margin-top: 4px;
+  }
+
+  #pumpcast-widget.collapsed {
+    width: 240px;
+    height: 76px;
+    max-height: 76px;
+  }
+}
+
+/* --- Very short screens (e.g. 768px or less tall) --- */
+@media (max-height: 680px) {
+  #pumpcast-widget .pumpcast-donation-section {
+    display: none;
+  }
+
+  #pumpcast-widget .pumpcast-history-list {
+    max-height: 50px;
+  }
+}
+
+/* --- Mobile / small screens (≤640px wide) --- */
+@media (max-width: 640px) {
+  #pumpcast-widget.pumpcast-widget {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: auto;
+    max-width: 100%;
+  }
+}
