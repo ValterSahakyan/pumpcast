@@ -176,29 +176,46 @@ app.get("/api/token", async (req, res) => {
 
 // Admin: save token config
 app.post("/api/admin/token", requireAdmin, async (req, res) => {
-  const { symbol, name, address, pumpfun_url, icon_url, description } = req.body;
   try {
+    const {
+      symbol = "",
+      name = "",
+      address = "",
+      pumpfun_url = "",
+      icon_url = "",
+      description = "",
+    } = req.body || {};
+
     await pool.query(`
-      UPDATE token_config SET
-        symbol      = $1,
-        name        = $2,
-        address     = $3,
-        pumpfun_url = $4,
-        icon_url    = $5,
-        description = $6
-      WHERE id = 1
+      INSERT INTO token_config (
+        id,
+        symbol,
+        name,
+        address,
+        pumpfun_url,
+        icon_url,
+        description
+      )
+      VALUES (1, $1, $2, $3, $4, $5, $6)
+      ON CONFLICT (id) DO UPDATE SET
+        symbol      = EXCLUDED.symbol,
+        name        = EXCLUDED.name,
+        address     = EXCLUDED.address,
+        pumpfun_url = EXCLUDED.pumpfun_url,
+        icon_url    = EXCLUDED.icon_url,
+        description = EXCLUDED.description
     `, [
-      (symbol      || "").trim(),
-      (name        || "").trim(),
-      (address     || "").trim(),
-      (pumpfun_url || "").trim(),
-      (icon_url    || "").trim(),
-      (description || "").trim(),
+      String(symbol).trim(),
+      String(name).trim(),
+      String(address).trim(),
+      String(pumpfun_url).trim(),
+      String(icon_url).trim(),
+      String(description).trim(),
     ]);
     res.json({ success: true });
   } catch (err) {
     console.error("POST /api/admin/token:", err.message);
-    res.status(500).json({ success: false, error: err.message });
+    res.status(500).json({ success: false, error: `Failed to save token config: ${err.message}` });
   }
 });
 
@@ -345,6 +362,15 @@ async function initDb() {
         description TEXT         DEFAULT '',
         CONSTRAINT single_row CHECK (id = 1)
       )
+    `);
+    await client.query(`
+      ALTER TABLE token_config
+        ADD COLUMN IF NOT EXISTS symbol      VARCHAR(20)  DEFAULT 'PCAST',
+        ADD COLUMN IF NOT EXISTS name        VARCHAR(100) DEFAULT 'PumpCast AI',
+        ADD COLUMN IF NOT EXISTS address     VARCHAR(200) DEFAULT '',
+        ADD COLUMN IF NOT EXISTS pumpfun_url TEXT         DEFAULT '',
+        ADD COLUMN IF NOT EXISTS icon_url    TEXT         DEFAULT '',
+        ADD COLUMN IF NOT EXISTS description TEXT         DEFAULT ''
     `);
     await client.query(`
       INSERT INTO token_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING
