@@ -34,29 +34,35 @@ const tokenStateStore = createTokenStateStore(pool);
 
 app.set("trust proxy", true);
 app.use(
-  cors({
-    allowedHeaders: ["Content-Type", "Authorization"],
-    methods: ["GET", "POST", "OPTIONS"],
-    origin(origin, callback) {
-      if (!origin || allowedOrigins === "*") {
-        callback(null, true);
-        return;
-      }
+  cors(function resolveCorsOptions(req, callback) {
+    const origin = req.headers.origin;
 
-      if (
-        allowedOrigins.includes(origin) ||
-        origin === "https://dexscreener.com" ||
-        origin === "https://pump.fun" ||
-        origin.startsWith("chrome-extension://") ||
-        origin.startsWith("http://localhost") ||
-        origin.startsWith("http://127.0.0.1")
-      ) {
-        callback(null, true);
-        return;
-      }
+    // Admin routes: allow any origin — requireAdmin (wallet check) is the security boundary
+    if (req.path.startsWith("/api/admin/")) {
+      return callback(null, {
+        origin: true,
+        allowedHeaders: ["Content-Type", "Authorization"],
+        methods: ["GET", "POST", "OPTIONS"],
+      });
+    }
 
-      callback(new Error("Origin not allowed by CORS"));
-    },
+    // Public routes: strict origin check
+    if (!origin || allowedOrigins === "*") {
+      return callback(null, { origin: true, allowedHeaders: ["Content-Type", "Authorization"], methods: ["GET", "POST", "OPTIONS"] });
+    }
+
+    if (
+      allowedOrigins.includes(origin) ||
+      origin === "https://dexscreener.com" ||
+      origin === "https://pump.fun" ||
+      origin.startsWith("chrome-extension://") ||
+      origin.startsWith("http://localhost") ||
+      origin.startsWith("http://127.0.0.1")
+    ) {
+      return callback(null, { origin: true, allowedHeaders: ["Content-Type", "Authorization"], methods: ["GET", "POST", "OPTIONS"] });
+    }
+
+    callback(new Error("Origin not allowed by CORS"));
   })
 );
 app.use(express.json({ limit: "2mb" }));
@@ -110,11 +116,8 @@ app.get("/api/ads", async (req, res) => {
   }
 });
 
-// Admin routes allow any origin — requireAdmin (wallet check) is the security boundary
-const adminCors = cors({ origin: true, allowedHeaders: ["Content-Type", "Authorization"], methods: ["GET", "POST", "OPTIONS"] });
-
 // Admin: all ads including inactive
-app.get("/api/admin/ads", adminCors, requireAdmin, async (req, res) => {
+app.get("/api/admin/ads", requireAdmin, async (req, res) => {
   try {
     const { rows } = await pool.query(
       "SELECT * FROM ads ORDER BY sort_order ASC, id ASC"
@@ -127,7 +130,7 @@ app.get("/api/admin/ads", adminCors, requireAdmin, async (req, res) => {
 });
 
 // Admin: replace all ads atomically
-app.post("/api/admin/ads", adminCors, requireAdmin, async (req, res) => {
+app.post("/api/admin/ads", requireAdmin, async (req, res) => {
   const { ads } = req.body || {};
   if (!Array.isArray(ads)) {
     return res.status(400).json({ success: false, error: "ads must be an array" });
@@ -182,7 +185,7 @@ app.get("/api/token", async (req, res) => {
 });
 
 // Admin: save token config
-app.post("/api/admin/token", adminCors, requireAdmin, async (req, res) => {
+app.post("/api/admin/token", requireAdmin, async (req, res) => {
   try {
     const {
       symbol = "",
