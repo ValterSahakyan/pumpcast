@@ -80,6 +80,10 @@ function clampText(value, maxLength) {
   return String(value || "").trim().slice(0, maxLength);
 }
 
+function toTrimmedString(value) {
+  return String(value || "").trim();
+}
+
 function normalizeAd(ad, index) {
   return {
     image: String(ad?.image || "").trim(),
@@ -186,32 +190,59 @@ app.post("/api/admin/token", requireAdmin, async (req, res) => {
       description = "",
     } = req.body || {};
 
-    await pool.query(`
-      INSERT INTO token_config (
-        id,
-        symbol,
-        name,
-        address,
-        pumpfun_url,
-        icon_url,
-        description
-      )
-      VALUES (1, $1, $2, $3, $4, $5, $6)
-      ON CONFLICT (id) DO UPDATE SET
-        symbol      = EXCLUDED.symbol,
-        name        = EXCLUDED.name,
-        address     = EXCLUDED.address,
-        pumpfun_url = EXCLUDED.pumpfun_url,
-        icon_url    = EXCLUDED.icon_url,
-        description = EXCLUDED.description
-    `, [
-      String(symbol).trim(),
-      String(name).trim(),
-      String(address).trim(),
-      String(pumpfun_url).trim(),
-      String(icon_url).trim(),
-      String(description).trim(),
-    ]);
+    const values = [
+      toTrimmedString(symbol),
+      toTrimmedString(name),
+      toTrimmedString(address),
+      toTrimmedString(pumpfun_url),
+      toTrimmedString(icon_url),
+      toTrimmedString(description),
+    ];
+
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const updateResult = await client.query(
+        `
+          UPDATE token_config SET
+            symbol      = $1,
+            name        = $2,
+            address     = $3,
+            pumpfun_url = $4,
+            icon_url    = $5,
+            description = $6
+          WHERE id = 1
+        `,
+        values
+      );
+
+      if (updateResult.rowCount === 0) {
+        await client.query(
+          `
+            INSERT INTO token_config (
+              id,
+              symbol,
+              name,
+              address,
+              pumpfun_url,
+              icon_url,
+              description
+            )
+            VALUES (1, $1, $2, $3, $4, $5, $6)
+          `,
+          values
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      throw err;
+    } finally {
+      client.release();
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error("POST /api/admin/token:", err.message);
@@ -336,6 +367,12 @@ async function initDb() {
     `);
     await client.query(`
       ALTER TABLE ads
+        ADD COLUMN IF NOT EXISTS image      TEXT,
+        ADD COLUMN IF NOT EXISTS badge      VARCHAR(50),
+        ADD COLUMN IF NOT EXISTS title      VARCHAR(255),
+        ADD COLUMN IF NOT EXISTS "desc"     TEXT,
+        ADD COLUMN IF NOT EXISTS link       TEXT,
+        ADD COLUMN IF NOT EXISTS accent     VARCHAR(50),
         ADD COLUMN IF NOT EXISTS active     BOOLEAN NOT NULL DEFAULT TRUE,
         ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0
     `);
@@ -365,6 +402,7 @@ async function initDb() {
     `);
     await client.query(`
       ALTER TABLE token_config
+        ADD COLUMN IF NOT EXISTS id          INTEGER DEFAULT 1,
         ADD COLUMN IF NOT EXISTS symbol      VARCHAR(20)  DEFAULT 'PCAST',
         ADD COLUMN IF NOT EXISTS name        VARCHAR(100) DEFAULT 'PumpCast AI',
         ADD COLUMN IF NOT EXISTS address     VARCHAR(200) DEFAULT '',
@@ -373,7 +411,14 @@ async function initDb() {
         ADD COLUMN IF NOT EXISTS description TEXT         DEFAULT ''
     `);
     await client.query(`
-      INSERT INTO token_config (id) VALUES (1) ON CONFLICT (id) DO NOTHING
+      UPDATE token_config SET id = 1 WHERE id IS NULL
+    `);
+    await client.query(`
+      INSERT INTO token_config (id)
+      SELECT 1
+      WHERE NOT EXISTS (
+        SELECT 1 FROM token_config WHERE id = 1
+      )
     `);
     console.log("Database ready.");
   } finally {
