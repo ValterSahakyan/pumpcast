@@ -2,7 +2,6 @@ require("dotenv").config();
 
 const cors = require("cors");
 const express = require("express");
-const path = require("path");
 const { Pool } = require("pg");
 
 const {
@@ -11,11 +10,10 @@ const {
 } = require("./services/dexScreener");
 const { detectEvent } = require("./services/eventDetector");
 const { generateCommentary } = require("./services/commentGenerator");
-const tokenStateStore = require("./store/tokenState");
+const { createTokenStateStore } = require("./store/tokenState");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
-const landingDistDir = path.join(__dirname, "landing-react", "dist");
 const allowedOriginConfig = process.env.ALLOWED_ORIGIN || "*";
 const allowedOrigins =
   allowedOriginConfig === "*"
@@ -24,7 +22,17 @@ const allowedOrigins =
         .split(",")
         .map((origin) => origin.trim())
         .filter(Boolean);
+const dbUrl =
+  process.env.DATABASE_URL || "postgres://admin:adminpassword@localhost:5432/pumpcast";
+const pool = new Pool({
+  connectionString: dbUrl,
+  max: Number(process.env.DB_POOL_MAX || 20),
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+const tokenStateStore = createTokenStateStore(pool);
 
+app.set("trust proxy", true);
 app.use(
   cors({
     allowedHeaders: ["Content-Type", "Authorization"],
@@ -52,13 +60,12 @@ app.use(
   })
 );
 app.use(express.json());
-app.use(express.static(landingDistDir));
-app.use(express.static("."));
 
-const dbUrl = process.env.DATABASE_URL || "postgres://admin:adminpassword@localhost:5432/pumpcast";
-const pool = new Pool({ connectionString: dbUrl });
-
-const ADMIN_WALLET = "0xd21760a4ad624d15ee37570b3c09fd3bff489309";
+const ADMIN_WALLET = (
+  process.env.ADMIN_WALLET || "0xd21760a4ad624d15ee37570b3c09fd3bff489309"
+)
+  .toLowerCase()
+  .trim();
 
 function requireAdmin(req, res, next) {
   const wallet = (req.headers.authorization || "").toLowerCase().trim();
@@ -174,7 +181,17 @@ app.post("/api/admin/token", requireAdmin, async (req, res) => {
 });
 
 app.get("/health", (_req, res) => {
-  res.json({ ok: true });
+  res.json({ ok: true, service: "pumpcast-backend" });
+});
+
+app.get("/health/db", async (_req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ ok: true, database: "up" });
+  } catch (error) {
+    console.error("Database health check failed:", error.message);
+    res.status(503).json({ ok: false, database: "down" });
+  }
 });
 
 app.get("/api/commentator", async (req, res) => {
@@ -200,45 +217,50 @@ app.get("/api/commentator", async (req, res) => {
   try {
     const marketData = await fetchDexScreenerMarketData(rawAddress);
     const key = marketData.token.address.toLowerCase();
-    const previousState = tokenStateStore.getState(key);
-    const event = detectEvent({
-      marketData,
-      previousState,
-      mode,
-      now: Date.now(),
-    });
-
-    let comment = null;
-    let message = "No meaningful market event detected.";
-
-    if (event) {
-      comment = await generateCommentary({
-        mode,
-        event,
+    const result = await tokenStateStore.withLockedState(key, async (previousState) => {
+      const now = Date.now();
+      const event = detectEvent({
         marketData,
         previousState,
+        mode,
+        now,
       });
-      message = "Meaningful market event detected.";
-    }
 
-    tokenStateStore.updateState(key, {
-      token: marketData.token,
-      market: marketData.market,
-      lastObservedAt: Date.now(),
-      lastEventType: event ? event.type : previousState?.lastEventType || null,
-      lastEventPriority: event ? event.priority : previousState?.lastEventPriority || null,
-      lastCommentAt: comment ? Date.now() : previousState?.lastCommentAt || 0,
-      lastCommentText: comment || previousState?.lastCommentText || "",
+      let comment = null;
+      let message = "No meaningful market event detected.";
+
+      if (event) {
+        comment = await generateCommentary({
+          mode,
+          event,
+          marketData,
+          previousState,
+        });
+        message = "Meaningful market event detected.";
+      }
+
+      return {
+        response: {
+          success: true,
+          token: marketData.token,
+          event,
+          comment,
+          message,
+          market: marketData.market,
+        },
+        nextState: {
+          token: marketData.token,
+          market: marketData.market,
+          lastObservedAt: now,
+          lastEventType: event ? event.type : previousState?.lastEventType || null,
+          lastEventPriority: event ? event.priority : previousState?.lastEventPriority || null,
+          lastCommentAt: comment ? now : previousState?.lastCommentAt || 0,
+          lastCommentText: comment || previousState?.lastCommentText || "",
+        },
+      };
     });
 
-    res.json({
-      success: true,
-      token: marketData.token,
-      event,
-      comment,
-      message,
-      market: marketData.market,
-    });
+    res.json(result);
   } catch (error) {
     console.error("Commentator API error:", error);
     res.status(500).json({
@@ -247,15 +269,6 @@ app.get("/api/commentator", async (req, res) => {
       details: error.message,
     });
   }
-});
-
-app.get("*", (req, res, next) => {
-  if (req.path.startsWith("/api/")) {
-    next();
-    return;
-  }
-
-  res.sendFile(path.join(landingDistDir, "index.html"));
 });
 
 app.use((error, _req, res, _next) => {
@@ -288,6 +301,18 @@ async function initDb() {
         ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0
     `);
     await client.query(`
+      CREATE TABLE IF NOT EXISTS token_states (
+        token_address       TEXT PRIMARY KEY,
+        token               JSONB,
+        market              JSONB,
+        last_observed_at    BIGINT NOT NULL DEFAULT 0,
+        last_event_type     TEXT,
+        last_event_priority TEXT,
+        last_comment_at     BIGINT NOT NULL DEFAULT 0,
+        last_comment_text   TEXT NOT NULL DEFAULT ''
+      )
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS token_config (
         id          INTEGER PRIMARY KEY DEFAULT 1,
         symbol      VARCHAR(20)  DEFAULT 'PCAST',
@@ -316,9 +341,32 @@ async function start() {
     process.exit(1);
   }
 
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`Pumpcast backend listening on http://localhost:${port}`);
   });
+
+  async function shutdown(signal) {
+    console.log(`Received ${signal}. Shutting down gracefully.`);
+
+    const forceExitTimer = setTimeout(() => {
+      console.error("Forced shutdown after timeout.");
+      process.exit(1);
+    }, 10000);
+    forceExitTimer.unref();
+
+    server.close(async () => {
+      try {
+        await pool.end();
+        process.exit(0);
+      } catch (error) {
+        console.error("Error during shutdown:", error.message);
+        process.exit(1);
+      }
+    });
+  }
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 start();
