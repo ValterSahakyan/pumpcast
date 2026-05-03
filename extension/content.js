@@ -22,6 +22,7 @@
   let lastUrl = location.href;
   const LOGO_URL = chrome.runtime.getURL("logo-light.png");
   let availableVoices = [];
+  let adSliderResizeHandlerBound = false;
 
   const VOICE_PROFILES = {
     godmode: "🎙️ GODMODE",
@@ -370,6 +371,51 @@
   ];
   let ADS = [];
 
+  function truncateTextToFit(element, text) {
+    if (!element) return;
+
+    const fullText = String(text || "").trim();
+    element.textContent = fullText;
+    element.title = fullText;
+
+    if (!fullText) return;
+
+    if (element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight) {
+      return;
+    }
+
+    let low = 0;
+    let high = fullText.length;
+    let best = "...";
+
+    while (low <= high) {
+      const mid = Math.floor((low + high) / 2);
+      const candidate = `${fullText.slice(0, mid).trimEnd()}...`;
+      element.textContent = candidate;
+
+      if (element.scrollWidth <= element.clientWidth && element.scrollHeight <= element.clientHeight) {
+        best = candidate;
+        low = mid + 1;
+      } else {
+        high = mid - 1;
+      }
+    }
+
+    element.textContent = best;
+  }
+
+  function fitAdDescriptions(root) {
+    root.querySelectorAll(".pumpcast-ad-desc").forEach((descEl) => {
+      truncateTextToFit(descEl, descEl.dataset.fullText || descEl.textContent || "");
+    });
+  }
+
+  function scheduleFitAdDescriptions(root) {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => fitAdDescriptions(root));
+    });
+  }
+
   function injectWidget() {
     if (!isPumpFunCoinPage() || document.getElementById("pumpcast-widget")) {
       return;
@@ -636,7 +682,7 @@
           <div class="pumpcast-ad-body">
             <span class="pumpcast-ad-badge" style="color:${accent};background:${accent}18;border-color:${accent}44;">${ad.badge || "AD"}</span>
             <span class="pumpcast-ad-title">${ad.title || "Your Ad Here"}</span>
-            <span class="pumpcast-ad-desc">${ad.desc || "Click to learn more"}</span>
+            <span class="pumpcast-ad-desc" data-full-text="${String(ad.desc || "Click to learn more").replace(/"/g, "&quot;")}">${ad.desc || "Click to learn more"}</span>
           </div>
         `;
         track.appendChild(item);
@@ -670,6 +716,8 @@
         sliderEl.addEventListener("mouseleave", startAuto);
         startAuto();
       }
+
+      scheduleFitAdDescriptions(root);
     }
 
     // Fetch ads via background service worker. Show defaults immediately so the
@@ -690,6 +738,13 @@
       // Re-render only if we got real ads different from what's showing
       if (ADS !== DEFAULT_ADS) renderAds();
     });
+
+    if (!adSliderResizeHandlerBound) {
+      window.addEventListener("resize", () => {
+        if (widgetRoot) scheduleFitAdDescriptions(widgetRoot);
+      });
+      adSliderResizeHandlerBound = true;
+    }
 
     // Auto-start commentary by default
     setTimeout(() => {
