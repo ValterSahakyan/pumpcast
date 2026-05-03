@@ -1,30 +1,37 @@
-name: Backend CI/CD
+name: Production CI/CD
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - 'services/**'
-      - 'store/**'
-      - 'landing-react/**'
-      - 'package-lock.json'
-      - 'landing-react/package-lock.json'
-      - 'server.js'
-      - 'package.json'
-      - 'Dockerfile'
-      - '.github/workflows/backend.yml'
+      - ".github/workflows/backend.yml"
+      - "Dockerfile"
+      - "docker-compose.yml"
+      - "nginx.conf"
+      - ".dockerignore"
+      - ".env.example"
+      - "package.json"
+      - "package-lock.json"
+      - "server.js"
+      - "services/**"
+      - "store/**"
+      - "landing-react/**"
+      - "admin-react/**"
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-backend
+  BACKEND_IMAGE: ghcr.io/${{ github.repository }}-backend
+  LANDING_IMAGE: ghcr.io/${{ github.repository }}-landing
+  ADMIN_IMAGE: ghcr.io/${{ github.repository }}-admin
 
 jobs:
-  build-and-push:
+  verify:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -37,170 +44,155 @@ jobs:
           cache-dependency-path: |
             package-lock.json
             landing-react/package-lock.json
+            admin-react/package-lock.json
 
       - name: Install backend dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Install landing page dependencies
+      - name: Validate backend sources
+        run: npm run check
+
+      - name: Install landing dependencies
         working-directory: landing-react
-        run: npm install
+        run: npm ci
 
-      - name: Build landing page
+      - name: Build landing app
         working-directory: landing-react
         run: npm run build
 
-      - name: Log in to the Container registry
+      - name: Install admin dependencies
+        working-directory: admin-react
+        run: npm ci
+
+      - name: Build admin app
+        working-directory: admin-react
+        run: npm run build
+
+  build-and-push:
+    runs-on: ubuntu-latest
+    needs: verify
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      backend_tag: ${{ steps.tags.outputs.backend_tag }}
+      landing_tag: ${{ steps.tags.outputs.landing_tag }}
+      admin_tag: ${{ steps.tags.outputs.admin_tag }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      - name: Set image tags
+        id: tags
+        run: |
+          echo "backend_tag=${BACKEND_IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "landing_tag=${LANDING_IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "admin_tag=${ADMIN_IMAGE}:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
         with:
           context: .
+          file: ./Dockerfile
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ steps.tags.outputs.backend_tag }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+
+      - name: Build and push landing image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./landing-react
+          file: ./landing-react/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.landing_tag }}
+            ${{ env.LANDING_IMAGE }}:latest
+          cache-from: type=gha,scope=landing
+          cache-to: type=gha,mode=max,scope=landing
+
+      - name: Build and push admin image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./admin-react
+          file: ./admin-react/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.tags.outputs.admin_tag }}
+            ${{ env.ADMIN_IMAGE }}:latest
+          cache-from: type=gha,scope=admin
+          cache-to: type=gha,mode=max,scope=admin
 
   deploy:
-    needs: build-and-push
     runs-on: ubuntu-latest
+    needs: build-and-push
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: read
     env:
       SSH_HOST: ${{ secrets.DEPLOY_HOST != '' && secrets.DEPLOY_HOST || secrets.SERVER_HOST }}
       SSH_USER: ${{ secrets.DEPLOY_USER != '' && secrets.DEPLOY_USER || secrets.SERVER_USER }}
       SSH_KEY: ${{ secrets.DEPLOY_KEY != '' && secrets.DEPLOY_KEY || secrets.SSH_PRIVATE_KEY }}
+      GHCR_USERNAME: ${{ secrets.GHCR_USERNAME != '' && secrets.GHCR_USERNAME || github.actor }}
+      GHCR_TOKEN: ${{ secrets.GHCR_TOKEN != '' && secrets.GHCR_TOKEN || github.token }}
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Validate deploy secrets
         run: |
-          if [ -z "${SSH_HOST}" ]; then
-            echo "Missing SSH host. Set DEPLOY_HOST or SERVER_HOST in GitHub Actions secrets."
-            exit 1
-          fi
-          if [ -z "${SSH_USER}" ]; then
-            echo "Missing SSH username. Set DEPLOY_USER or SERVER_USER in GitHub Actions secrets."
-            exit 1
-          fi
-          if [ -z "${SSH_KEY}" ]; then
-            echo "Missing SSH private key. Set DEPLOY_KEY or SSH_PRIVATE_KEY in GitHub Actions secrets."
-            exit 1
-          fi
+          test -n "${SSH_HOST}" || (echo "Missing DEPLOY_HOST or SERVER_HOST secret." && exit 1)
+          test -n "${SSH_USER}" || (echo "Missing DEPLOY_USER or SERVER_USER secret." && exit 1)
+          test -n "${SSH_KEY}" || (echo "Missing DEPLOY_KEY or SSH_PRIVATE_KEY secret." && exit 1)
+          test -n "${GHCR_USERNAME}" || (echo "Missing GHCR_USERNAME secret." && exit 1)
+          test -n "${GHCR_TOKEN}" || (echo "Missing GHCR_TOKEN secret." && exit 1)
 
-      - name: Deploy to Server via SSH
+      - name: Copy deployment files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ env.SSH_HOST }}
+          username: ${{ env.SSH_USER }}
+          key: ${{ env.SSH_KEY }}
+          source: "docker-compose.yml,nginx.conf,.env.example"
+          target: "~/pumpcast"
+
+      - name: Deploy containers on server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ env.SSH_HOST }}
           username: ${{ env.SSH_USER }}
           key: ${{ env.SSH_KEY }}
+          script_stop: true
+          envs: GHCR_USERNAME,GHCR_TOKEN
           script: |
-            set -e
-            APP_PORT=3011
+            set -eu
+            mkdir -p "$HOME/pumpcast"
+            cd "$HOME/pumpcast"
 
-            get_port_pids() {
-              if command -v lsof >/dev/null 2>&1; then
-                lsof -ti tcp:${APP_PORT} || true
-              elif command -v ss >/dev/null 2>&1; then
-                ss -ltnp "( sport = :${APP_PORT} )" 2>/dev/null | awk 'NR > 1 { print $NF }' | sed -n 's/.*pid=\([0-9]\+\).*/\1/p' | sort -u
-              fi
-            }
-
-            get_systemd_unit_for_pid() {
-              PID="$1"
-              if [ -r "/proc/${PID}/cgroup" ]; then
-                sed -n 's|.*\/\([^/][^/]*\.service\)$|\1|p' "/proc/${PID}/cgroup" | head -n 1
-              fi
-            }
-
-            clear_app_port() {
-              PORT_PIDS="$(get_port_pids)"
-              if [ -n "$PORT_PIDS" ]; then
-                echo "Stopping host process(es) using port ${APP_PORT}: $PORT_PIDS"
-                kill $PORT_PIDS || true
-                sleep 2
-              fi
-
-              PORT_PIDS="$(get_port_pids)"
-              if [ -n "$PORT_PIDS" ]; then
-                echo "Force killing remaining process(es) on port ${APP_PORT}: $PORT_PIDS"
-                kill -9 $PORT_PIDS || true
-                sleep 2
-              fi
-
-              PORT_PIDS="$(get_port_pids)"
-              if [ -n "$PORT_PIDS" ] && command -v systemctl >/dev/null 2>&1; then
-                for PID in $PORT_PIDS; do
-                  UNIT="$(get_systemd_unit_for_pid "$PID")"
-                  if [ -n "$UNIT" ]; then
-                    echo "Stopping systemd unit ${UNIT} for PID ${PID}"
-                    systemctl stop "$UNIT" || true
-                  fi
-                done
-                sleep 2
-              fi
-
-              for i in 1 2 3 4 5; do
-                PORT_PIDS="$(get_port_pids)"
-                if [ -z "$PORT_PIDS" ]; then
-                  return 0
-                fi
-                echo "Waiting for port ${APP_PORT} to be released (attempt $i): $PORT_PIDS"
-                if command -v systemctl >/dev/null 2>&1; then
-                  for PID in $PORT_PIDS; do
-                    UNIT="$(get_systemd_unit_for_pid "$PID")"
-                    if [ -n "$UNIT" ]; then
-                      echo "Port holder details: PID=${PID}, UNIT=${UNIT}"
-                    else
-                      ps -p "$PID" -o pid=,ppid=,user=,comm=,args= || true
-                    fi
-                  done
-                fi
-                sleep 2
-              done
-
-              PORT_PIDS="$(get_port_pids)"
-              if [ -n "$PORT_PIDS" ]; then
-                echo "Port ${APP_PORT} is still occupied after cleanup: $PORT_PIDS"
-                exit 1
-              fi
-            }
-
-            if [ -d "$HOME/pumpcast" ]; then
-              cd "$HOME/pumpcast"
-            elif [ -d "/var/www/pumpcast" ]; then
-              cd "/var/www/pumpcast"
-            else
-              echo "Deploy directory not found. Expected $HOME/pumpcast or /var/www/pumpcast."
-              exit 1
+            if [ ! -f .env ]; then
+              cp .env.example .env
+              echo "Created .env from .env.example. Update production secrets before relying on the service."
             fi
 
-            if [ -d ".git" ]; then
-              git fetch origin main
-              git checkout main
-              git pull --ff-only origin main
-            else
-              echo "Deploy directory is not a git checkout."
-              exit 1
-            fi
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
 
-            if docker compose version >/dev/null 2>&1; then
-              docker compose down --remove-orphans || true
-              clear_app_port
-              docker compose pull
-              docker compose up -d --build
-            elif command -v docker-compose >/dev/null 2>&1; then
-              docker-compose down --remove-orphans || true
-              clear_app_port
-              docker-compose pull
-              docker-compose up -d --build
-            else
-              echo "Neither 'docker compose' nor 'docker-compose' is installed on the server."
-              exit 1
-            fi
+            export BACKEND_IMAGE='${{ needs.build-and-push.outputs.backend_tag }}'
+            export LANDING_IMAGE='${{ needs.build-and-push.outputs.landing_tag }}'
+            export ADMIN_IMAGE='${{ needs.build-and-push.outputs.admin_tag }}'
+
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker image prune -f
