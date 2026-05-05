@@ -373,7 +373,7 @@ function App() {
             <div className="mock-widget">
               <div className="mock-widget-header">
                 <div className="mock-brand">
-                  <img src="/assets/logo.png" alt="Logo" />
+                  <img src="/assets/logo.png" alt="PumpCast AI Logo" />
                   <div>
                     <div className="mock-eyebrow">LIVE COMMENTARY</div>
                     <div className="mock-title">PumpCast AI</div>

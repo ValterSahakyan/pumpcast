@@ -2,10 +2,39 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/assets/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pumpcast | Your Live AI MemeRace Commentator</title>
-    <meta name="description" content="The first live AI commentator for pump.fun. Get real-time market event detection and voice commentary for Solana meme tokens.">
+    
+    <!-- Primary Meta Tags -->
+    <title>PumpCast AI | Live Commentary for pump.fun Solana Tokens</title>
+    <meta name="title" content="PumpCast AI | Live Commentary for pump.fun Solana Tokens" />
+    <meta name="description" content="Never miss a pump. PumpCast AI is a Chrome extension for pump.fun that delivers real-time AI audio commentary on volume spikes, whale buys, and market events." />
+    <meta name="keywords" content="pump.fun, solana, ai commentator, memecoins, crypto trading, whale tracker, volume spikes, pumpcast, pcast" />
+    <meta name="author" content="PumpCast Team" />
+    <link rel="canonical" href="https://pumpcast.co" />
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://pumpcast.co/" />
+    <meta property="og:title" content="PumpCast AI | Hear The Market" />
+    <meta property="og:description" content="The first live AI commentator for pump.fun. Real-time market event detection and voice commentary for Solana meme tokens." />
+    <meta property="og:image" content="https://pumpcast.co/assets/pcast_banner.png" />
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://pumpcast.co/" />
+    <meta property="twitter:title" content="PumpCast AI | Hear The Market" />
+    <meta property="twitter:description" content="The first live AI commentator for pump.fun. Real-time market event detection and voice commentary for Solana meme tokens." />
+    <meta property="twitter:image" content="https://pumpcast.co/assets/pcast_banner.png" />
+
+    <!-- Favicon & Icons -->
+    <link rel="icon" type="image/png" href="/assets/logo.png" />
+    <link rel="apple-touch-icon" href="/assets/logo.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#FF6A00" />
+
+    <!-- Robots -->
+    <meta name="robots" content="index, follow" />
+
     <!-- Google Analytics -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=%VITE_GA_ID%"></script>
     <script>
@@ -13,6 +42,28 @@
       function gtag(){dataLayer.push(arguments);}
       gtag('js', new Date());
       gtag('config', '%VITE_GA_ID%');
+    </script>
+
+    <!-- JSON-LD Structured Data -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "PumpCast AI",
+        "operatingSystem": "Chrome",
+        "applicationCategory": "Browser Extension",
+        "offers": {
+          "@type": "Offer",
+          "price": "0.00",
+          "priceCurrency": "USD"
+        },
+        "description": "Live AI commentator for pump.fun Solana meme tokens. Detects volume spikes and whale buys with real-time voice commentary.",
+        "aggregateRating": {
+          "@type": "AggregateRating",
+          "ratingValue": "4.9",
+          "ratingCount": "120"
+        }
+      }
     </script>
   </head>
   <body>

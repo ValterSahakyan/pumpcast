@@ -1,0 +1,21 @@
+{
+  "name": "PumpCast AI",
+  "short_name": "PumpCast",
+  "description": "Live AI commentator for pump.fun Solana meme tokens.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F0F10",
+  "theme_color": "#FF6A00",
+  "icons": [
+    {
+      "src": "/assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
