@@ -238,8 +238,8 @@ function AdCard({ ad, index, total, onUpdate, onRemove, onMoveUp, onMoveDown }) 
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {[
-            { label: '↑', action: () => onMoveUp(index), disabled: index === 0 },
-            { label: '↓', action: () => onMoveDown(index), disabled: index === total - 1 },
+            { label: 'Up', action: () => onMoveUp(index), disabled: index === 0 },
+            { label: 'Down', action: () => onMoveDown(index), disabled: index === total - 1 },
           ].map((btn) => (
             <button
               key={btn.label}
