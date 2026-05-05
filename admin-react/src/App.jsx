@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserProvider } from 'ethers';
 
 const ADMIN_WALLET = '0xd21760A4ad624d15ee37570B3C09Fd3Bff489309'.toLowerCase();
@@ -176,7 +176,7 @@ function AdPreview({ ad }) {
   );
 }
 
-function AdCard({ ad, index, total, onUpdate, onRemove, onMoveUp, onMoveDown }) {
+function AdCard({ ad, index, onUpdate, onRemove, onDragStart, onDragOver, onDrop, onDragEnd, isDragOver }) {
   const field = (label, key, placeholder, fullWidth = false) => (
     <div style={{ gridColumn: fullWidth ? '1 / -1' : undefined }}>
       <label
@@ -202,14 +202,20 @@ function AdCard({ ad, index, total, onUpdate, onRemove, onMoveUp, onMoveDown }) 
 
   return (
     <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart(index); }}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
+      onDrop={() => onDrop(index)}
+      onDragEnd={onDragEnd}
       style={{
-        border: '1px solid #1e1e1e',
+        border: isDragOver ? '1px solid #FF6A00' : '1px solid #1e1e1e',
         borderRadius: 12,
         marginBottom: 16,
-        background: '#0a0a0a',
+        background: isDragOver ? '#140a00' : '#0a0a0a',
         overflow: 'hidden',
         opacity: ad.active === false ? 0.55 : 1,
-        transition: 'opacity 0.2s',
+        transition: 'opacity 0.2s, border-color 0.15s, background 0.15s',
+        cursor: 'grab',
       }}
     >
       <div
@@ -223,6 +229,12 @@ function AdCard({ ad, index, total, onUpdate, onRemove, onMoveUp, onMoveDown }) 
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span
+            title="Drag to reorder"
+            style={{ fontSize: 16, color: '#333', cursor: 'grab', lineHeight: 1, userSelect: 'none', paddingRight: 4 }}
+          >
+            ⠿
+          </span>
           <span style={{ fontSize: 12, color: '#444', fontWeight: 600 }}>AD #{index + 1}</span>
           <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', userSelect: 'none' }}>
             <input
@@ -237,23 +249,6 @@ function AdCard({ ad, index, total, onUpdate, onRemove, onMoveUp, onMoveDown }) 
           </label>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {[
-            { label: 'Up', action: () => onMoveUp(index), disabled: index === 0 },
-            { label: 'Down', action: () => onMoveDown(index), disabled: index === total - 1 },
-          ].map((btn) => (
-            <button
-              key={btn.label}
-              onClick={btn.action}
-              disabled={btn.disabled}
-              style={{
-                ...BTN_GHOST,
-                color: btn.disabled ? '#333' : '#888',
-                cursor: btn.disabled ? 'default' : 'pointer',
-              }}
-            >
-              {btn.label}
-            </button>
-          ))}
           <button onClick={() => onRemove(index)} style={{ ...BTN_GHOST, color: '#FF4D4D', borderColor: '#FF4D4D33' }}>
             Remove
           </button>
@@ -481,6 +476,8 @@ export default function Admin() {
   const [ads, setAds] = useState([]);
   const [fetching, setFetching] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dragOverIndex, setDragOverIndex] = useState(null);
+  const dragIndexRef = useRef(null);
   const [token, setToken] = useState({
     symbol: '',
     name: '',
@@ -593,15 +590,33 @@ export default function Admin() {
     setAds((prev) => prev.filter((_, i) => i !== index));
   }, []);
 
-  const moveAd = useCallback((index, dir) => {
+  const handleDragStart = useCallback((index) => {
+    dragIndexRef.current = index;
+  }, []);
+
+  const handleDragOver = useCallback((index) => {
+    setDragOverIndex(index);
+  }, []);
+
+  const handleDrop = useCallback((toIndex) => {
+    const fromIndex = dragIndexRef.current;
+    if (fromIndex === null || fromIndex === toIndex) {
+      setDragOverIndex(null);
+      return;
+    }
     setAds((prev) => {
-      if (index + dir < 0 || index + dir >= prev.length) {
-        return prev;
-      }
       const next = [...prev];
-      [next[index], next[index + dir]] = [next[index + dir], next[index]];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
       return next;
     });
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
+  }, []);
+
+  const handleDragEnd = useCallback(() => {
+    dragIndexRef.current = null;
+    setDragOverIndex(null);
   }, []);
 
   if (wallet !== ADMIN_WALLET) {
@@ -765,11 +780,13 @@ export default function Admin() {
             key={i}
             ad={ad}
             index={i}
-            total={ads.length}
             onUpdate={updateAd}
             onRemove={removeAd}
-            onMoveUp={(idx) => moveAd(idx, -1)}
-            onMoveDown={(idx) => moveAd(idx, 1)}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onDragEnd={handleDragEnd}
+            isDragOver={dragOverIndex === i}
           />
         ))}
 
