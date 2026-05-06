@@ -1,3 +1,5 @@
+const { fetchPumpFunMarketData } = require("./pumpFun");
+
 const DEX_SCREENER_BASE = "https://api.dexscreener.com/latest/dex";
 const SOLANA_ADDRESS_REGEX = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
 
@@ -81,7 +83,10 @@ async function fetchDexScreenerMarketData(address) {
     return normalizePair(pair, address);
   }
 
-  throw new Error("No Solana pair data found for the provided address.");
+  // DEX Screener doesn't have this token yet — fall back to pump.fun's own API
+  return fetchPumpFunMarketData(address).catch(() => {
+    throw new Error("No Solana pair data found for the provided address.");
+  });
 }
 
 module.exports = {

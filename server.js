@@ -341,7 +341,7 @@ app.get("/api/commentator", async (req, res) => {
     if (error.message === "No Solana pair data found for the provided address.") {
       return res.status(404).json({
         success: false,
-        error: "Token not found on DEX Screener. It may be too new or not yet indexed.",
+        error: "Token market data unavailable. The token may have been removed or is invalid.",
       });
     }
     console.error("Commentator API error:", error);
