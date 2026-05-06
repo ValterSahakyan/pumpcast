@@ -74,7 +74,8 @@ async function fetchDexScreenerMarketData(address) {
   }
 
   const pairResponse = await fetchJson(`${DEX_SCREENER_BASE}/pairs/solana/${address}`).catch(() => null);
-  const pair = pairResponse?.pair || null;
+  // API returns either { pair: {...} } (old) or { pairs: [...] } (new) depending on version
+  const pair = pairResponse?.pair || pairResponse?.pairs?.[0] || null;
 
   if (pair && pair.chainId === "solana") {
     return normalizePair(pair, address);

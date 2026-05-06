@@ -254,7 +254,10 @@
       });
 
       if (!result || !result.success) {
-        throw new Error(result?.error || "Backend request failed.");
+        const msg = result?.details
+          ? `${result.error || "Backend request failed."}: ${result.details}`
+          : (result?.error || "Backend request failed.");
+        throw new Error(msg);
       }
 
       const payload = result.payload;
