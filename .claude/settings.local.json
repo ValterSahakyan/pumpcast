@@ -21,7 +21,10 @@
       "Bash(curl -s http://localhost:3001/)",
       "Bash(powershell -Command \"Compress-Archive -Path extension/manifest.json,extension/background.js,extension/config.js,extension/content.js,extension/widget.css,extension/dark.png,extension/light.png,extension/logo-light.png,extension/pumpcast.png -DestinationPath pumpcast-extension-v0.2.0.zip -Force\")",
       "Bash(cat admin-react/vite.config.js)",
-      "Bash(cat admin-react/vite.config.ts)"
+      "Bash(cat admin-react/vite.config.ts)",
+      "Bash(npm install *)",
+      "Bash(node --check server.js)",
+      "Bash(node --check services/tokenVerifier.js)"
     ]
   }
 }

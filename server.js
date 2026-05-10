@@ -1,5 +1,6 @@
 require("dotenv").config();
 
+const crypto = require("crypto");
 const cors = require("cors");
 const express = require("express");
 const { Pool } = require("pg");
@@ -11,6 +12,12 @@ const {
 const { detectEvent } = require("./services/eventDetector");
 const { generateCommentary } = require("./services/commentGenerator");
 const { createTokenStateStore } = require("./store/tokenState");
+const {
+  verifySolanaSignature,
+  getSolanaTokenBalance,
+  getPcastPriceUsd,
+  MIN_USD_VALUE,
+} = require("./services/tokenVerifier");
 
 const app = express();
 const port = Number(process.env.PORT || 3001);
@@ -31,6 +38,10 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 const tokenStateStore = createTokenStateStore(pool);
+const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "pumpcast-dev-access-secret";
+const ACCESS_TOKEN_TTL_MS = Number(
+  process.env.ACCESS_TOKEN_TTL_MS || 24 * 60 * 60 * 1000
+);
 
 app.set("trust proxy", true);
 app.use(
@@ -101,6 +112,83 @@ function normalizeAd(ad, index) {
     active: ad?.active !== false,
     sortOrder: index,
   };
+}
+
+function toBase64Url(value) {
+  return Buffer.from(value)
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function fromBase64Url(value) {
+  const normalized = String(value || "").replace(/-/g, "+").replace(/_/g, "/");
+  const padding = "=".repeat((4 - (normalized.length % 4 || 4)) % 4);
+  return Buffer.from(normalized + padding, "base64").toString("utf8");
+}
+
+function signAccessToken(payload) {
+  const body = toBase64Url(JSON.stringify(payload));
+  const signature = crypto
+    .createHmac("sha256", ACCESS_TOKEN_SECRET)
+    .update(body)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  return `${body}.${signature}`;
+}
+
+function verifyAccessToken(token) {
+  const [body, signature] = String(token || "").split(".");
+  if (!body || !signature) {
+    return null;
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", ACCESS_TOKEN_SECRET)
+    .update(body)
+    .digest("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+
+  const actualBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  if (
+    actualBuffer.length !== expectedBuffer.length ||
+    !crypto.timingSafeEqual(actualBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+
+  try {
+    const payload = JSON.parse(fromBase64Url(body));
+    if (!payload?.wallet || !payload?.exp || payload.exp < Date.now()) {
+      return null;
+    }
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+function requireHolderAccess(req, res, next) {
+  const authHeader = String(req.headers.authorization || "").trim();
+  const token = authHeader.startsWith("Bearer ")
+    ? authHeader.slice("Bearer ".length).trim()
+    : "";
+  const payload = verifyAccessToken(token);
+
+  if (!payload) {
+    return res
+      .status(401)
+      .json({ success: false, error: "Holder access required." });
+  }
+
+  req.holderAccess = payload;
+  next();
 }
 
 // Public: only active ads for the extension
@@ -177,7 +265,14 @@ app.post("/api/admin/ads", requireAdmin, async (req, res) => {
 app.get("/api/token", async (req, res) => {
   try {
     const { rows } = await pool.query("SELECT * FROM token_config WHERE id = 1");
-    res.json({ success: true, token: rows[0] || null });
+    res.json({
+      success: true,
+      token: rows[0] || null,
+      gate: {
+        minUsdValue: MIN_USD_VALUE,
+        accessTokenTtlMs: ACCESS_TOKEN_TTL_MS,
+      },
+    });
   } catch (err) {
     console.error("GET /api/token:", err.message);
     res.status(500).json({ success: false, error: "Database error" });
@@ -256,6 +351,160 @@ app.post("/api/admin/token", requireAdmin, async (req, res) => {
   }
 });
 
+// ─── Token-gate auth ──────────────────────────────────────────────────────────
+// Single-use nonces prevent replay attacks. Each nonce lives for 5 minutes.
+const nonceStore = new Map(); // wallet -> { nonce, expiresAt }
+const NONCE_TTL_MS = 5 * 60 * 1000;
+
+function describeSignaturePayload(signature) {
+  if (Array.isArray(signature)) {
+    return { type: "array", length: signature.length };
+  }
+  if (!signature) {
+    return { type: "empty", length: 0 };
+  }
+  if (typeof signature === "string") {
+    return { type: "string", length: signature.length, preview: signature.slice(0, 16) };
+  }
+  if (Array.isArray(signature?.data)) {
+    return { type: "data-array", length: signature.data.length };
+  }
+  if (signature instanceof Uint8Array) {
+    return { type: "uint8array", length: signature.length };
+  }
+  if (signature?.signature) {
+    return {
+      type: "nested-signature",
+      nested: describeSignaturePayload(signature.signature),
+    };
+  }
+  return {
+    type: typeof signature,
+    keys: Object.keys(signature).slice(0, 12),
+  };
+}
+
+function generateNonce() {
+  return (
+    Math.random().toString(36).slice(2) +
+    Math.random().toString(36).slice(2) +
+    Date.now().toString(36)
+  );
+}
+
+function pruneExpiredNonces() {
+  const now = Date.now();
+  for (const [k, v] of nonceStore) {
+    if (v.expiresAt < now) nonceStore.delete(k);
+  }
+}
+
+// GET /api/auth/nonce?wallet=<base58-solana-address>
+app.get("/api/auth/nonce", (req, res) => {
+  const wallet = String(req.query.wallet || "").trim();
+  if (!isValidSolanaAddress(wallet)) {
+    return res.status(400).json({ success: false, error: "Invalid wallet address." });
+  }
+  pruneExpiredNonces();
+  const nonce = generateNonce();
+  nonceStore.set(wallet, { nonce, expiresAt: Date.now() + NONCE_TTL_MS });
+  res.json({ success: true, nonce });
+});
+
+// POST /api/auth/verify
+// body: { wallet: string, signature: number[], nonce: string }
+app.post("/api/auth/verify", async (req, res) => {
+  const { wallet, signature, nonce } = req.body || {};
+
+  if (
+    typeof wallet !== "string" ||
+    typeof nonce !== "string" ||
+    !Array.isArray(signature) ||
+    signature.length === 0
+  ) {
+    return res.status(400).json({ success: false, error: "Missing or invalid fields." });
+  }
+
+  if (!isValidSolanaAddress(wallet)) {
+    return res.status(400).json({ success: false, error: "Invalid wallet address." });
+  }
+
+  // 1 — Validate nonce
+  const stored = nonceStore.get(wallet);
+  if (!stored || stored.nonce !== nonce || stored.expiresAt < Date.now()) {
+    return res.status(401).json({ success: false, error: "Nonce is invalid or expired." });
+  }
+  nonceStore.delete(wallet); // single-use
+
+  // 2 — Verify Ed25519 signature (proves the caller owns the wallet's private key)
+  const message = `PumpCast Access: ${nonce}`;
+  const sigValid = verifySolanaSignature(wallet, message, signature);
+  if (!sigValid) {
+    const signatureDebug = describeSignaturePayload(signature);
+    console.warn("Signature verification failed", {
+      wallet,
+      nonce,
+      messageLength: message.length,
+      signatureDebug,
+    });
+    return res.status(401).json({
+      success: false,
+      error: "Signature verification failed.",
+      details: signatureDebug,
+    });
+  }
+
+  // 3 — Look up $PCAST token address from DB
+  let mintAddress = null;
+  try {
+    const { rows } = await pool.query("SELECT address FROM token_config WHERE id = 1");
+    mintAddress = rows[0]?.address || null;
+  } catch (err) {
+    console.error("Token config DB error:", err.message);
+    return res.status(503).json({ success: false, error: "Token config unavailable." });
+  }
+
+  if (!mintAddress) {
+    return res.status(503).json({ success: false, error: "Token not configured yet." });
+  }
+
+  // 4 — Check token balance + price in parallel
+  let balance = 0;
+  let priceUsd = 0;
+  try {
+    [balance, priceUsd] = await Promise.all([
+      getSolanaTokenBalance(wallet, mintAddress),
+      getPcastPriceUsd(mintAddress),
+    ]);
+  } catch (err) {
+    console.error("Token balance check error:", err.message);
+    return res.status(503).json({ success: false, error: "Could not fetch token balance." });
+  }
+
+  const balanceUsd = balance * priceUsd;
+  const access = balanceUsd >= MIN_USD_VALUE;
+  const expiresAt = access ? Date.now() + ACCESS_TOKEN_TTL_MS : null;
+  const accessToken = access
+    ? signAccessToken({
+        wallet,
+        exp: expiresAt,
+        mintAddress,
+      })
+    : null;
+
+  res.json({
+    success: true,
+    access,
+    balance,
+    priceUsd,
+    balanceUsd,
+    required: MIN_USD_VALUE,
+    mintAddress,
+    accessToken,
+    expiresAt,
+  });
+});
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "pumpcast-backend" });
 });
@@ -270,7 +519,7 @@ app.get("/health/db", async (_req, res) => {
   }
 });
 
-app.get("/api/commentator", async (req, res) => {
+app.get("/api/commentator", requireHolderAccess, async (req, res) => {
   const rawAddress = String(req.query.address || "").trim();
   const mode = String(req.query.mode || "race").trim().toLowerCase();
 

@@ -23,6 +23,13 @@
   const LOGO_URL = chrome.runtime.getURL("logo-light.png");
   let availableVoices = [];
   let adSliderResizeHandlerBound = false;
+  const DEFAULT_GATE_CONFIG = {
+    minUsdValue: 5,
+    tokenSymbol: "PCAST",
+    tokenAddress: "",
+    pumpFunUrl: "https://pumpcast.co",
+  };
+  let gateConfig = { ...DEFAULT_GATE_CONFIG };
 
   const VOICE_PROFILES = {
     godmode: "🎙️ GODMODE",
@@ -239,12 +246,21 @@
     updateStatus(isSpeaking ? "Speaking" : "Watching");
 
     try {
+      const access = await getStoredAccess();
+      if (!access?.accessToken) {
+        await resetToGate("Connect your holder wallet to unlock PumpCast.");
+        return;
+      }
+
       const requestUrl =
         `${BACKEND_URL}/api/commentator?address=${encodeURIComponent(currentAddress)}&mode=${encodeURIComponent(currentMode)}`;
       
       const result = await chrome.runtime.sendMessage({
         type: "pumpcast:fetchCommentary",
         url: requestUrl,
+        headers: {
+          Authorization: `Bearer ${access.accessToken}`,
+        },
       }).catch(err => {
         // Handle common Chrome error when extension is reloaded but page is not
         if (err.message?.includes("Extension context invalidated")) {
@@ -254,6 +270,10 @@
       });
 
       if (!result || !result.success) {
+        if (result?.status === 401) {
+          await resetToGate("Session expired. Reconnect your holder wallet.");
+          return;
+        }
         const msg = result?.details
           ? `${result.error || "Backend request failed."}: ${result.details}`
           : (result?.error || "Backend request failed.");
@@ -323,6 +343,42 @@
     updateStatus("Idle");
   }
 
+  function syncGateConfig(payload) {
+    const token = payload?.token || null;
+    const gate = payload?.gate || null;
+    const tokenAddress = String(token?.address || "").trim();
+    const pumpFunUrl =
+      String(token?.pumpfun_url || "").trim() ||
+      (tokenAddress ? `https://pump.fun/coin/${tokenAddress}` : gateConfig.pumpFunUrl);
+
+    gateConfig = {
+      minUsdValue: Number.isFinite(Number(gate?.minUsdValue))
+        ? Number(gate.minUsdValue)
+        : gateConfig.minUsdValue,
+      tokenSymbol:
+        String(token?.symbol || gateConfig.tokenSymbol || DEFAULT_GATE_CONFIG.tokenSymbol).trim() ||
+        DEFAULT_GATE_CONFIG.tokenSymbol,
+      tokenAddress,
+      pumpFunUrl: pumpFunUrl || DEFAULT_GATE_CONFIG.pumpFunUrl,
+    };
+  }
+
+  async function fetchGateConfig() {
+    try {
+      const result = await chrome.runtime.sendMessage({
+        type: "pumpcast:fetchToken",
+        url: `${BACKEND_URL}/api/token`,
+      });
+
+      if (result?.success && result.payload) {
+        syncGateConfig(result.payload);
+        return result.payload;
+      }
+    } catch (_error) {}
+
+    return null;
+  }
+
   function handleUrlChange() {
     if (location.href === lastUrl) {
       return;
@@ -344,7 +400,7 @@
     }
 
     if (!widgetRoot) {
-      injectWidget();
+      initWidget();
       return;
     }
 
@@ -478,15 +534,111 @@
     return item;
   }
 
-  function injectWidget() {
+  function initAdSlider(root) {
+    const sliderEl = root.querySelector("[data-role='ad-slider']");
+    const track = root.querySelector("[data-role='ad-track']");
+    const dotsContainer = root.querySelector("[data-role='ad-dots']");
+    if (!sliderEl || !track || !dotsContainer) {
+      return;
+    }
+
+    track.innerHTML = "";
+    dotsContainer.innerHTML = "";
+
+    if (!ADS.length) {
+      sliderEl.style.display = "none";
+      return;
+    }
+
+    sliderEl.style.display = "";
+    const count = ADS.length;
+    let currentAdIndex = 0;
+    let adInterval = null;
+
+    track.style.width = `${count * 100}%`;
+    track.style.transform = "translateX(0)";
+
+    function goToAd(index) {
+      currentAdIndex = index;
+      track.style.transform = `translateX(-${((index * 100) / count).toFixed(4)}%)`;
+      dotsContainer.querySelectorAll(".pumpcast-ad-dot")
+        .forEach((dot, dotIndex) => dot.classList.toggle("active", dotIndex === index));
+    }
+
+    ADS.forEach((ad, index) => {
+      const item = createAdItem(ad, index, count);
+      track.appendChild(item);
+
+      if (count > 1) {
+        const dot = document.createElement("button");
+        dot.className = `pumpcast-ad-dot${index === 0 ? " active" : ""}`;
+        dot.addEventListener("click", () => goToAd(index));
+        dotsContainer.appendChild(dot);
+      }
+    });
+
+    dotsContainer.style.display = count > 1 ? "" : "none";
+
+    if (count > 1) {
+      const startAuto = () => {
+        clearInterval(adInterval);
+        adInterval = window.setInterval(() => goToAd((currentAdIndex + 1) % count), 4000);
+      };
+      const stopAuto = () => {
+        clearInterval(adInterval);
+      };
+
+      sliderEl.onmouseenter = stopAuto;
+      sliderEl.onmouseleave = startAuto;
+      startAuto();
+    } else {
+      sliderEl.onmouseenter = null;
+      sliderEl.onmouseleave = null;
+    }
+
+    scheduleFitAdDescriptions(root);
+    setTimeout(() => scheduleFitAdDescriptions(root), 120);
+    setTimeout(() => scheduleFitAdDescriptions(root), 400);
+  }
+
+  function loadAdsInto(root) {
+    ADS = DEFAULT_ADS;
+    initAdSlider(root);
+
+    Promise.race([
+      chrome.runtime.sendMessage({ type: "pumpcast:fetchAds", url: BACKEND_URL + "/api/ads" })
+        .then((result) => {
+          if (result?.success && result.payload?.ads?.length > 0) {
+            ADS = result.payload.ads;
+          }
+        })
+        .catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 5000)),
+    ]).then(() => {
+      if (widgetRoot === root && ADS !== DEFAULT_ADS) {
+        initAdSlider(root);
+      }
+    });
+
+    if (!adSliderResizeHandlerBound) {
+      window.addEventListener("resize", () => {
+        if (widgetRoot) scheduleFitAdDescriptions(widgetRoot);
+      });
+      adSliderResizeHandlerBound = true;
+    }
+  }
+
+  function injectMainWidget() {
     if (!isPumpFunCoinPage() || document.getElementById("pumpcast-widget")) {
       return;
     }
 
     currentAddress = extractPumpFunAddress(location.href);
 
-    const DONATION_ADDRESS = "FAomiJibEwiNy7teURECEzyrUaJpVGxkBqZUEAH4ViGt";
-    const PCAST_TOKEN_ADDRESS = ""; // TODO: fill in after token is created on pump.fun
+    const PCAST_TOKEN_ADDRESS = gateConfig.tokenAddress;
+    const PCAST_TOKEN_URL = gateConfig.pumpFunUrl || (PCAST_TOKEN_ADDRESS
+      ? `https://pump.fun/coin/${PCAST_TOKEN_ADDRESS}`
+      : "");
 
     const root = document.createElement("aside");
     root.id = "pumpcast-widget";
@@ -531,7 +683,7 @@
         </div>
 
         ${PCAST_TOKEN_ADDRESS ? `
-        <a href="https://pump.fun/coin/${PCAST_TOKEN_ADDRESS}" target="_blank" class="pumpcast-token-banner">
+        <a href="${PCAST_TOKEN_URL}" target="_blank" class="pumpcast-token-banner">
           <div class="pumpcast-token-banner-icon"><img src="${LOGO_URL}" style="width:20px;height:20px;object-fit:contain;" /></div>
           <div class="pumpcast-token-banner-content">
             <span class="pumpcast-token-banner-title">$PCAST Token is LIVE!</span>
@@ -594,56 +746,19 @@
           <ul class="pumpcast-history-list" data-role="history"></ul>
         </div>
 
-        <div class="pumpcast-donation-section" title="If you're enjoying Pumpcast, consider sending some SOL to support the dev!">
-          <div class="pumpcast-donation-header">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-            Support
-          </div>
-          <div class="pumpcast-donation-text">If you're banking on pump.fun, consider supporting the dev!</div>
-          <div class="pumpcast-address-box" data-role="donate" title="Click to copy SOL address">
-            <span class="pumpcast-address-text">${DONATION_ADDRESS}</span>
-            <svg class="pumpcast-copy-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
-            <div class="pumpcast-copy-feedback" data-role="copy-feedback">Copied!</div>
-          </div>
-        </div>
-
         <div class="pumpcast-footer">
           <a href="https://pumpcast.co" target="_blank">pumpcast.co</a>
           <span>&bull;</span>
           <a href="https://x.com/pump_cast_ai" target="_blank">X</a>
           <span>&bull;</span>
           <a href="https://t.me/pumpcastco" target="_blank">Telegram</a>
-          ${PCAST_TOKEN_ADDRESS ? `<span>&bull;</span><a href="https://pump.fun/coin/${PCAST_TOKEN_ADDRESS}" target="_blank" class="pumpcast-footer-token-link"><img src="${LOGO_URL}" style="width:12px;height:12px;object-fit:contain;vertical-align:middle;margin-top:-2px;margin-right:2px;" /> $PCAST</a>` : ''}
+          ${PCAST_TOKEN_ADDRESS ? `<span>&bull;</span><a href="${PCAST_TOKEN_URL}" target="_blank" class="pumpcast-footer-token-link"><img src="${LOGO_URL}" style="width:12px;height:12px;object-fit:contain;vertical-align:middle;margin-top:-2px;margin-right:2px;" /> $${gateConfig.tokenSymbol}</a>` : ''}
         </div>
       </div>
     `;
 
     document.body.appendChild(root);
     widgetRoot = root;
-
-    root.querySelector("[data-role='donate']").addEventListener("click", async () => {
-      try {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(DONATION_ADDRESS);
-        } else {
-          const textArea = document.createElement("textarea");
-          textArea.value = DONATION_ADDRESS;
-          textArea.style.position = "fixed";
-          textArea.style.left = "-999999px";
-          textArea.style.top = "-999999px";
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
-          document.execCommand('copy');
-          textArea.remove();
-        }
-        const feedback = root.querySelector("[data-role='copy-feedback']");
-        feedback.classList.add("show");
-        setTimeout(() => feedback.classList.remove("show"), 2000);
-      } catch (err) {
-        console.error("Failed to copy address:", err);
-      }
-    });
 
     root.querySelector(".pumpcast-logo-container").addEventListener("click", () => {
       const reactions = [
@@ -799,11 +914,326 @@
   }
 
 
+  // ─── Wallet bridge (postMessage ↔ MAIN world wallet-bridge.js) ───────────────
+  const walletBridgeCallbacks = {};
+  let walletBridgeListenerReady = false;
+
+  function setupWalletBridgeListener() {
+    if (walletBridgeListenerReady) return;
+    walletBridgeListenerReady = true;
+    window.addEventListener("message", (event) => {
+      if (event.source !== window) return;
+      const { type } = event.data || {};
+      const cb = walletBridgeCallbacks[type];
+      if (cb) {
+        delete walletBridgeCallbacks[type];
+        cb(event.data);
+      }
+    });
+  }
+
+  function bridgeCall(requestType, responseType, payload, timeoutMs) {
+    return new Promise((resolve) => {
+      setupWalletBridgeListener();
+      let settled = false;
+
+      walletBridgeCallbacks[responseType] = (data) => {
+        if (!settled) { settled = true; resolve(data); }
+      };
+
+      window.postMessage({ type: requestType, ...payload }, "*");
+
+      setTimeout(() => {
+        if (!settled) {
+          settled = true;
+          delete walletBridgeCallbacks[responseType];
+          resolve({ error: "Timeout" });
+        }
+      }, timeoutMs || 30_000);
+    });
+  }
+
+  // ─── Token-gate: cached access ────────────────────────────────────────────────
+  const GATE_STORAGE_KEY = "pumpcast_access";
+  const GATE_EXPIRY_MS   = 24 * 60 * 60 * 1000; // 24 h
+
+  async function clearStoredAccess() {
+    try {
+      await chrome.storage.local.remove(GATE_STORAGE_KEY);
+    } catch {}
+  }
+
+  async function getStoredAccess() {
+    try {
+      const stored = await chrome.storage.local.get(GATE_STORAGE_KEY);
+      const access = stored[GATE_STORAGE_KEY];
+      if (!access || !access.expiresAt || !access.accessToken || !access.wallet) {
+        return null;
+      }
+      if (access.expiresAt < Date.now()) {
+        await clearStoredAccess();
+        return null;
+      }
+      return access;
+    } catch {
+      return null;
+    }
+  }
+
+  async function checkCachedAccess() {
+    return Boolean(await getStoredAccess());
+  }
+
+  async function persistAccess({ wallet, accessToken, expiresAt }) {
+    await chrome.storage.local.set({
+      [GATE_STORAGE_KEY]: {
+        wallet,
+        accessToken,
+        grantedAt: Date.now(),
+        expiresAt: Number(expiresAt) || (Date.now() + GATE_EXPIRY_MS),
+      },
+    });
+  }
+
+  async function resetToGate(message) {
+    await clearStoredAccess();
+    stopPolling();
+    if (widgetRoot?.parentNode) {
+      widgetRoot.remove();
+    }
+    widgetRoot = null;
+    await initWidget(message);
+  }
+
+  // ─── Token-gate: gate widget UI ───────────────────────────────────────────────
+  function injectGateWidget(gateNotice) {
+    if (!isPumpFunCoinPage() || document.getElementById("pumpcast-widget")) return;
+
+    const root = document.createElement("aside");
+    root.id = "pumpcast-widget";
+    root.className = "pumpcast-widget pumpcast-gate";
+    root.innerHTML = `
+      <div class="pumpcast-glow pumpcast-glow-1"></div>
+      <div class="pumpcast-glow pumpcast-glow-2"></div>
+      <div class="pumpcast-gate-body">
+        <div class="pumpcast-gate-logo-wrap">
+          <img class="pumpcast-gate-logo" src="${LOGO_URL}" alt="PumpCast" />
+        </div>
+        <div class="pumpcast-gate-title">PumpCast AI</div>
+        <div class="pumpcast-gate-subtitle">Exclusive to $${gateConfig.tokenSymbol} Holders</div>
+        <div class="pumpcast-gate-lock">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+        </div>
+        <div class="pumpcast-gate-req" id="pumpcast-gate-req">
+          Hold at least <strong>$${gateConfig.minUsdValue}</strong> of <strong>$${gateConfig.tokenSymbol}</strong> to unlock
+        </div>
+        <div class="pumpcast-ad-slider" data-role="ad-slider">
+          <div class="pumpcast-ad-track" data-role="ad-track"></div>
+          <div class="pumpcast-ad-dots" data-role="ad-dots"></div>
+        </div>
+        <button class="btn btn-primary pumpcast-gate-connect" id="pumpcast-connect-btn" type="button">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/>
+            <path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/>
+            <path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/>
+          </svg>
+          Connect Wallet
+        </button>
+        <div class="pumpcast-gate-status" id="pumpcast-gate-status"></div>
+        <a class="pumpcast-buy-link" id="pumpcast-buy-link" href="${gateConfig.pumpFunUrl}" target="_blank" rel="noreferrer">
+          Buy $${gateConfig.tokenSymbol} on pump.fun &#x2192;
+        </a>
+        <div class="pumpcast-gate-footer">
+          <a href="https://pumpcast.co" target="_blank" rel="noreferrer">pumpcast.co</a>
+          <span>&bull;</span>
+          <a href="https://t.me/pumpcastco" target="_blank" rel="noreferrer">Telegram</a>
+          <span>&bull;</span>
+          <a href="https://x.com/pump_cast_ai" target="_blank" rel="noreferrer">X</a>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(root);
+    widgetRoot = root;
+    loadAdsInto(root);
+
+    if (gateNotice) {
+      const statusEl = root.querySelector("#pumpcast-gate-status");
+      if (statusEl) {
+        statusEl.textContent = gateNotice;
+        statusEl.className = "pumpcast-gate-status pumpcast-gate-status--info";
+      }
+    }
+
+    fetchGateConfig().then((payload) => {
+      if (!payload || widgetRoot !== root) {
+        return;
+      }
+      const reqEl = root.querySelector("#pumpcast-gate-req");
+      const subtitleEl = root.querySelector(".pumpcast-gate-subtitle");
+      const buyLink = root.querySelector("#pumpcast-buy-link");
+
+      if (reqEl) {
+        reqEl.innerHTML =
+          `Hold at least <strong>$${gateConfig.minUsdValue}</strong> of <strong>$${gateConfig.tokenSymbol}</strong> to unlock`;
+      }
+
+      if (subtitleEl) {
+        subtitleEl.textContent = `Exclusive to $${gateConfig.tokenSymbol} Holders`;
+      }
+
+      if (buyLink) {
+        buyLink.href = gateConfig.pumpFunUrl;
+        buyLink.textContent = `Buy $${gateConfig.tokenSymbol} on pump.fun →`;
+      }
+    }).catch(() => {});
+
+    root.querySelector("#pumpcast-connect-btn").addEventListener("click", () => {
+      startWalletConnection(root);
+    });
+  }
+
+  // ─── Token-gate: wallet connection + verification flow ────────────────────────
+  async function startWalletConnection(gateRoot) {
+    const connectBtn = gateRoot.querySelector("#pumpcast-connect-btn");
+    const statusEl   = gateRoot.querySelector("#pumpcast-gate-status");
+
+    function setStatus(msg, kind) {
+      if (!statusEl) return;
+      statusEl.textContent = msg;
+      statusEl.className = `pumpcast-gate-status pumpcast-gate-status--${kind || "info"}`;
+    }
+
+    function setLoading(on) {
+      if (!connectBtn) return;
+      connectBtn.disabled = on;
+      connectBtn.innerHTML = on
+        ? '<span class="pumpcast-gate-spinner"></span>Verifying…'
+        : '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></svg> Connect Wallet';
+    }
+
+    setLoading(true);
+    setStatus("Connecting wallet…");
+
+    // Step 1 — connect wallet via MAIN world bridge
+    const connectResult = await bridgeCall(
+      "PUMPCAST_WALLET_CONNECT",
+      "PUMPCAST_WALLET_CONNECTED",
+      {},
+      60_000
+    );
+
+    if (connectResult.error) {
+      setLoading(false);
+      if (connectResult.error === "NO_WALLET" || connectResult.error === "Timeout") {
+        setStatus("No Solana wallet found. Install Phantom or Solflare and reload.", "error");
+      } else {
+        setStatus(`Connection cancelled: ${connectResult.error}`, "error");
+      }
+      return;
+    }
+
+    const wallet = connectResult.wallet;
+    setStatus("Getting verification code…");
+
+    // Step 2 — get single-use nonce from backend
+    const nonceMsg = await chrome.runtime.sendMessage({
+      type: "pumpcast:fetchNonce",
+      url: `${BACKEND_URL}/api/auth/nonce?wallet=${encodeURIComponent(wallet)}`,
+    }).catch(() => null);
+
+    if (!nonceMsg?.success || !nonceMsg.payload?.nonce) {
+      setLoading(false);
+      setStatus("Could not reach PumpCast server. Try again.", "error");
+      return;
+    }
+
+    const nonce = nonceMsg.payload.nonce;
+    setStatus("Sign the message in your wallet to prove ownership…");
+
+    // Step 3 — sign nonce with wallet private key
+    const signResult = await bridgeCall(
+      "PUMPCAST_SIGN_MESSAGE",
+      "PUMPCAST_MESSAGE_SIGNED",
+      { message: `PumpCast Access: ${nonce}` },
+      60_000
+    );
+
+    if (signResult.error) {
+      setLoading(false);
+      setStatus(`Signature rejected: ${signResult.error}`, "error");
+      return;
+    }
+
+    setStatus("Checking $PCAST balance…");
+
+    // Step 4 — verify signature + token balance on the backend
+    const signedWallet = signResult.wallet || wallet;
+    const verifyMsg = await chrome.runtime.sendMessage({
+      type: "pumpcast:verifyAccess",
+      url: `${BACKEND_URL}/api/auth/verify`,
+      body: { wallet: signedWallet, signature: signResult.signature, nonce },
+    }).catch(() => null);
+
+    if (!verifyMsg?.success) {
+      setLoading(false);
+      const detailText = verifyMsg?.details
+        ? ` (${typeof verifyMsg.details === "string" ? verifyMsg.details : JSON.stringify(verifyMsg.details)})`
+        : "";
+      setStatus(
+        `${verifyMsg?.error || "Verification failed. Please try again."}${detailText}`,
+        "error"
+      );
+      return;
+    }
+
+    const { access, balanceUsd, required, accessToken, expiresAt } = verifyMsg.payload;
+
+    if (!access) {
+      setLoading(false);
+      const held = (balanceUsd != null && balanceUsd > 0)
+        ? `$${balanceUsd.toFixed(2)}`
+        : "none";
+      setStatus(
+        `Insufficient $PCAST. You hold ${held} — need $${required}. Buy more below.`,
+        "error"
+      );
+      const buyLink = gateRoot.querySelector("#pumpcast-buy-link");
+      if (buyLink) buyLink.classList.add("pumpcast-buy-link--highlight");
+      return;
+    }
+
+    // Step 5 — access granted
+    await persistAccess({ wallet, accessToken, expiresAt });
+    setStatus("Access granted! Loading PumpCast…", "success");
+
+    setTimeout(() => {
+      if (gateRoot.parentNode) gateRoot.remove();
+      widgetRoot = null;
+      injectMainWidget();
+    }, 700);
+  }
+
+  // ─── Gate-aware widget init ───────────────────────────────────────────────────
+  async function initWidget(gateNotice) {
+    if (!isPumpFunCoinPage() || document.getElementById("pumpcast-widget")) return;
+    await fetchGateConfig();
+    const hasAccess = await checkCachedAccess();
+    if (hasAccess) {
+      injectMainWidget();
+    } else {
+      injectGateWidget(gateNotice);
+    }
+  }
+
   function observeSpaNavigation() {
     const observer = new MutationObserver(() => {
       handleUrlChange();
       if (!widgetRoot && isPumpFunCoinPage()) {
-        injectWidget();
+        initWidget();
       }
     });
 
@@ -819,12 +1249,12 @@
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
       loadVoices();
-      injectWidget();
+      initWidget();
       observeSpaNavigation();
     });
   } else {
     loadVoices();
-    injectWidget();
+    initWidget();
     observeSpaNavigation();
   }
 

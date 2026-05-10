@@ -237,18 +237,24 @@ function App() {
   const [scrolled, setScrolled]       = useState(false)
   const [activeVoice, setActiveVoice] = useState('godmode')
   const [tokenConfig, setTokenConfig] = useState(null)
+  const [gateConfig, setGateConfig] = useState(null)
   const isPrivacyPolicyPage = window.location.pathname === '/privacy-policy'
 
   useEffect(() => {
     fetch('/api/token')
       .then(r => r.json())
-      .then(d => { if (d.success && d.token) setTokenConfig(d.token) })
+      .then(d => {
+        if (d.success && d.token) setTokenConfig(d.token)
+        if (d.success && d.gate) setGateConfig(d.gate)
+      })
       .catch(() => {})
   }, [])
 
   const tokenSymbol  = tokenConfig?.symbol   || 'PCAST'
   const tokenAddress = tokenConfig?.address  || ''
   const tokenIconUrl = tokenConfig?.icon_url    || '/assets/logo-light.png'
+  const gateMinUsd   = gateConfig?.minUsdValue || 5
+  const tokenUtilityDesc = tokenConfig?.description || `Hold at least $${gateMinUsd} of $${tokenSymbol} to unlock the extension, early access drops, community testing, feature votes, token spotlight experiments, and future trader tools.`
   const tokenDesc    = tokenConfig?.description || 'Own a piece of PumpCast AI. The $PCAST token is live on pump.fun — be early, support the project, and ride the wave.'
   const pumpFunTokenUrl = tokenConfig?.pumpfun_url?.trim()
     || (tokenAddress ? `https://pump.fun/coin/${tokenAddress}` : null)
@@ -350,13 +356,13 @@ function App() {
               <span className="text-gradient">Hear The Market.</span>
             </motion.h1>
             <motion.p variants={fadeInUp} className="hero-subtitle">
-              PumpCast AI is a Chrome extension that overlays directly onto pump.fun. It uses advanced AI to instantly detect volume spikes, whale buys, and rugs, delivering <b>live audio commentary</b> right as the action happens.
+              PumpCast AI is a holder-gated Chrome extension for pump.fun. Hold at least <b>${gateMinUsd} of ${tokenSymbol}</b>, connect your Solana wallet, and unlock <b>live audio commentary</b>, early access experiments, and community-driven feature drops.
             </motion.p>
             <motion.div variants={fadeInUp} className="hero-actions">
-              <a href={pumpFunTokenUrl || '#token'} target={pumpFunTokenUrl ? '_blank' : undefined} rel="noreferrer" className="btn btn-primary btn-lg hero-token-btn" onClick={(e) => !pumpFunTokenUrl && scrollToSection(e, 'token')}>
+              <a href={pumpFunTokenUrl || "#token"} target={pumpFunTokenUrl ? "_blank" : undefined} rel="noreferrer" className="btn btn-primary btn-lg hero-token-btn" onClick={(e) => !pumpFunTokenUrl && scrollToSection(e, "token")}>
                 BUY ${tokenSymbol}
               </a>
-              <a href="#features" className="btn hero-features-btn" onClick={(e) => scrollToSection(e, 'features')}>
+              <a href="#features" className="btn hero-features-btn" onClick={(e) => scrollToSection(e, "features")}>
                 Explore Features
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </a>
@@ -451,7 +457,6 @@ function App() {
             <h2>Your AI Co-Pilot</h2>
             <p>Designed for meme traders who need eyes (and ears) everywhere.</p>
           </motion.div>
-          
           <motion.div 
             className="bento-grid"
             variants={staggerContainer}
@@ -461,7 +466,7 @@ function App() {
           >
             <motion.div variants={fadeInUp} className="bento-card col-span-2">
               <div className="bento-content">
-                <div className="bento-icon">🎙️</div>
+                <div className="bento-icon">Voice</div>
                 <h3>Live Audio Commentary</h3>
                 <p>Stop staring at the charts. Let the AI verbally announce volume spikes, bonding curve progress, and whale buys so you can multitask effectively.</p>
               </div>
@@ -470,7 +475,7 @@ function App() {
             
             <motion.div variants={fadeInUp} className="bento-card">
               <div className="bento-content">
-                <div className="bento-icon">🎭</div>
+                <div className="bento-icon">Cast</div>
                 <h3>6 Unique Voices</h3>
                 <p>Choose from <strong>GODMODE</strong>, <strong>GLITCH AI</strong>, <strong>HYPEMAN</strong>, the prophetic <strong>ORACLE</strong>, the grim <strong>DOOM</strong>, or the ruthless <strong>SARGE</strong>.</p>
               </div>
@@ -479,9 +484,36 @@ function App() {
             
             <motion.div variants={fadeInUp} className="bento-card col-span-3">
               <div className="bento-content">
-                <div className="bento-icon">⚡</div>
+                <div className="bento-icon">Pulse</div>
                 <h3>Instant Event Detection</h3>
-                <p>Our backend hooks into DexScreener to instantly detect liquidity drops, buy/sell ratios, and rapid price action before the crowd notices.</p>
+                <p>Our backend hooks into DexScreener to instantly detect liquidity drops, buy-sell ratios, and rapid price action before the crowd notices.</p>
+              </div>
+              <div className="bento-bg-gradient glow-green"></div>
+            </motion.div>
+            
+            <motion.div variants={fadeInUp} className="bento-card col-span-2">
+              <div className="bento-content">
+                <div className="bento-icon">Lock</div>
+                <h3>Holder-Only Access</h3>
+                <p>The extension unlocks only after a connected Solana wallet proves it holds at least <strong>${gateMinUsd}</strong> of <strong>${tokenSymbol}</strong>.</p>
+              </div>
+              <div className="bento-bg-gradient glow-orange"></div>
+            </motion.div>
+            
+            <motion.div variants={fadeInUp} className="bento-card">
+              <div className="bento-content">
+                <div className="bento-icon">Vote</div>
+                <h3>Community Direction</h3>
+                <p>Token holders get early access, community testing rounds, and feature voting so the roadmap is shaped by real users.</p>
+              </div>
+              <div className="bento-bg-gradient glow-purple"></div>
+            </motion.div>
+            
+            <motion.div variants={fadeInUp} className="bento-card col-span-3">
+              <div className="bento-content">
+                <div className="bento-icon">Alpha</div>
+                <h3>Utility Roadmap</h3>
+                <p>${tokenSymbol} is the access layer for token spotlight experiments now, with trader tools and premium workflows planned next.</p>
               </div>
               <div className="bento-bg-gradient glow-green"></div>
             </motion.div>
@@ -506,7 +538,7 @@ function App() {
                   <img src={tokenIconUrl} alt={`${tokenSymbol} Logo`} style={{ width: '34px', height: '34px', objectFit: 'contain' }} /> ${tokenSymbol} TOKEN
                 </span>
                 <h2 className="token-heading">${tokenSymbol} is <span className="token-heading-live">LIVE</span></h2>
-                <p className="token-desc">{tokenDesc}</p>
+                <p className="token-desc">{tokenUtilityDesc}</p>
                 <div className="token-actions">
                   <a href={pumpFunTokenUrl || 'https://pump.fun'} target="_blank" rel="noreferrer" className="btn token-buy-btn">
                     Buy ${tokenSymbol} on pump.fun
@@ -579,16 +611,16 @@ function App() {
             <motion.div variants={fadeInUp} className="step-card">
               <div className="step-number">02</div>
               <div className="step-content">
-                <h3>Open pump.fun</h3>
-                <p>Navigate to any token page on pump.fun. The widget will inject itself seamlessly over the chart.</p>
+                <h3>Hold ${tokenSymbol}</h3>
+                <p>Keep at least ${gateMinUsd} dollars worth of ${tokenSymbol} in your Solana wallet to qualify for access.</p>
               </div>
             </motion.div>
             
             <motion.div variants={fadeInUp} className="step-card">
               <div className="step-number">03</div>
               <div className="step-content">
-                <h3>Start Cast</h3>
-                <p>Click 'Start Cast', select your Voice Character, and let the AI do the heavy lifting!</p>
+                <h3>Connect And Unlock</h3>
+                <p>Open any pump.fun coin page, connect your wallet in the extension, sign once, and start the cast.</p>
               </div>
             </motion.div>
           </motion.div>

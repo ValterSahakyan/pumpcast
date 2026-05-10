@@ -1,50 +1,61 @@
 chrome.runtime.onInstalled.addListener(() => {
-  console.log("Pumpcast MemeRace Commentator installed.");
+  console.log("PumpCast AI installed.");
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type !== "pumpcast:fetchCommentary" && message?.type !== "pumpcast:fetchAds") {
-    return undefined;
-  }
+const HANDLED_TYPES = new Set([
+  "pumpcast:fetchCommentary",
+  "pumpcast:fetchAds",
+  "pumpcast:fetchNonce",
+  "pumpcast:verifyAccess",
+  "pumpcast:fetchToken",
+]);
 
-  const { url } = message;
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (!HANDLED_TYPES.has(message?.type)) return undefined;
+
+  const { type, url, body, headers } = message;
+
   if (!url) {
-    sendResponse({
-      success: false,
-      error: "Missing backend URL.",
-    });
+    sendResponse({ success: false, error: "Missing URL." });
     return false;
   }
 
   (async () => {
     try {
-      const response = await fetch(url, {
-        method: "GET",
+      const isPost = type === "pumpcast:verifyAccess";
+      const fetchOptions = {
+        method: isPost ? "POST" : "GET",
         headers: {
           Accept: "application/json",
+          ...(headers && typeof headers === "object" ? headers : {}),
         },
-      });
+      };
+
+      if (isPost && body) {
+        fetchOptions.headers["Content-Type"] = "application/json";
+        fetchOptions.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(url, fetchOptions);
 
       let payload = null;
       try {
         payload = await response.json();
-      } catch (_error) {
+      } catch {
         payload = null;
       }
 
       if (!response.ok) {
         sendResponse({
           success: false,
-          error: payload?.error || `Backend request failed with status ${response.status}.`,
+          status: response.status,
+          error: payload?.error || `Request failed with status ${response.status}.`,
           details: payload?.details || null,
         });
         return;
       }
 
-      sendResponse({
-        success: true,
-        payload,
-      });
+      sendResponse({ success: true, payload });
     } catch (error) {
       sendResponse({
         success: false,
@@ -53,5 +64,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
   })();
 
-  return true;
+  return true; // keep message channel open for async sendResponse
 });

@@ -1,9 +1,19 @@
 {
   "manifest_version": 3,
   "name": "PumpCast AI",
-  "version": "0.2.0",
-  "description": "Adds a live AI commentator overlay to pump.fun coin pages.",
+  "version": "0.3.0",
+  "description": "Adds a live AI commentator overlay to pump.fun coin pages. Exclusive to $PCAST holders.",
   "content_scripts": [
+    {
+      "matches": [
+        "https://pump.fun/coin/*"
+      ],
+      "js": [
+        "wallet-bridge.js"
+      ],
+      "world": "MAIN",
+      "run_at": "document_start"
+    },
     {
       "matches": [
         "https://pump.fun/coin/*"
@@ -40,10 +50,14 @@
       ]
     }
   ],
-  "permissions": [],
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://pump.fun/*",
     "https://pumpcast.co/*",
-    "https://www.pumpcast.co/*"
+    "https://www.pumpcast.co/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ]
 }
