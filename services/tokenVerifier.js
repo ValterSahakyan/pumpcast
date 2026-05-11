@@ -19,15 +19,9 @@ function normalizeSignatureBytes(signature) {
   if (typeof signature === "string") {
     const trimmed = signature.trim();
     if (!trimmed) return null;
-    try {
-      return Array.from(bs58.decode(trimmed));
-    } catch {}
-    try {
-      return Array.from(Buffer.from(trimmed, "base64"));
-    } catch {}
-    try {
-      return Array.from(Buffer.from(trimmed, "hex"));
-    } catch {}
+    try { return Array.from(bs58.decode(trimmed)); } catch {}
+    try { return Array.from(Buffer.from(trimmed, "base64")); } catch {}
+    try { return Array.from(Buffer.from(trimmed, "hex")); } catch {}
     return null;
   }
   if (Array.isArray(signature.data)) return signature.data;
@@ -41,17 +35,11 @@ function normalizeSignatureBytes(signature) {
   return null;
 }
 
-// Verify an Ed25519 signature produced by a Solana wallet (Phantom / Solflare).
-// walletAddress – base58-encoded Solana public key
-// message       – the plaintext string that was signed
-// signature     – Array<number> (0-255) representing the 64-byte signature
 function verifySolanaSignature(walletAddress, message, signature) {
   try {
     const publicKeyBytes = bs58.decode(walletAddress);
     const sigSource = normalizeSignatureBytes(signature);
-    if (!sigSource || !sigSource.length) {
-      return false;
-    }
+    if (!sigSource || !sigSource.length) return false;
     const sigBytes = Uint8Array.from(sigSource);
     const msgBytes = new TextEncoder().encode(message);
     return nacl.sign.detached.verify(msgBytes, sigBytes, publicKeyBytes);
@@ -60,8 +48,6 @@ function verifySolanaSignature(walletAddress, message, signature) {
   }
 }
 
-// Query Solana mainnet RPC for the SPL token balance held by walletAddress.
-// Returns the UI-formatted token amount (respects decimals) as a number.
 async function getSolanaTokenBalance(walletAddress, mintAddress) {
   const body = {
     jsonrpc: "2.0",
@@ -81,15 +67,9 @@ async function getSolanaTokenBalance(walletAddress, mintAddress) {
     signal: AbortSignal.timeout(10_000),
   });
 
-  if (!response.ok) {
-    throw new Error(`Solana RPC error: ${response.status}`);
-  }
-
+  if (!response.ok) throw new Error(`Solana RPC HTTP error: ${response.status}`);
   const data = await response.json();
-
-  if (data.error) {
-    throw new Error(`Solana RPC: ${data.error.message}`);
-  }
+  if (data.error) throw new Error(`Solana RPC error: ${data.error.message}`);
 
   const accounts = data.result?.value || [];
   let total = 0;
@@ -100,35 +80,62 @@ async function getSolanaTokenBalance(walletAddress, mintAddress) {
   return total;
 }
 
-// Fetch the current USD price of the $PCAST token from DexScreener.
-// Returns 0 if the token is not listed yet.
-async function getPcastPriceUsd(mintAddress) {
+// GeckoTerminal — works for all Solana tokens including pump.fun bonding curve
+async function priceFromGeckoTerminal(mintAddress) {
   try {
-    const response = await fetch(
-      `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`,
+    const res = await fetch(
+      `https://api.geckoterminal.com/api/v2/networks/solana/tokens/${mintAddress}/pools?page=1`,
       {
-        headers: { Accept: "application/json", "User-Agent": "pumpcast-verify" },
+        headers: { Accept: "application/json;version=20230302" },
         signal: AbortSignal.timeout(8_000),
       }
     );
-
-    if (!response.ok) return 0;
-
-    const data = await response.json();
-    const pairs = Array.isArray(data.pairs) ? data.pairs : [];
-
-    const solanaPairs = pairs.filter((p) => p.chainId === "solana");
-    if (!solanaPairs.length) return 0;
-
-    // Pick the highest-liquidity pair
-    const best = solanaPairs.sort(
-      (a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0)
-    )[0];
-
-    return parseFloat(best.priceUsd || 0) || 0;
-  } catch {
-    return 0;
+    if (!res.ok) return { price: 0, source: `gecko_${res.status}` };
+    const data = await res.json();
+    const pool = data?.data?.[0];
+    const price = parseFloat(pool?.attributes?.base_token_price_usd || 0) || 0;
+    return { price, source: "geckoterminal" };
+  } catch (e) {
+    return { price: 0, source: `gecko_fail:${e.message}` };
   }
+}
+
+// DexScreener by token address
+async function priceFromDexScreener(mintAddress) {
+  try {
+    const res = await fetch(
+      `https://api.dexscreener.com/latest/dex/tokens/${mintAddress}`,
+      {
+        headers: { Accept: "application/json", "User-Agent": "pumpcast-verify" },
+        signal: AbortSignal.timeout(7_000),
+      }
+    );
+    if (!res.ok) return { price: 0, source: `dex_${res.status}` };
+    const data = await res.json();
+    const pairs = Array.isArray(data.pairs) ? data.pairs : [];
+    const solanaPairs = pairs.filter((p) => p.chainId === "solana");
+    if (!solanaPairs.length) return { price: 0, source: "dex_no_pairs" };
+    const best = solanaPairs.sort((a, b) => (b.liquidity?.usd || 0) - (a.liquidity?.usd || 0))[0];
+    const price = parseFloat(best.priceUsd || 0) || 0;
+    return { price, source: "dexscreener" };
+  } catch (e) {
+    return { price: 0, source: `dex_fail:${e.message}` };
+  }
+}
+
+// Run all sources in parallel; return the first non-zero price found.
+async function getPcastPriceUsd(mintAddress) {
+  const results = await Promise.all([
+    priceFromGeckoTerminal(mintAddress),
+    priceFromDexScreener(mintAddress),
+  ]);
+
+  console.log("[price sources]", JSON.stringify(results));
+
+  for (const r of results) {
+    if (r.price > 0) return r.price;
+  }
+  return 0;
 }
 
 module.exports = {

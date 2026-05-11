@@ -454,21 +454,17 @@ app.post("/api/auth/verify", async (req, res) => {
     });
   }
 
-  // 3 — Look up $PCAST token address from DB
-  let mintAddress = null;
+  // 3 — Look up $PCAST token address (DB first, env fallback, hardcoded last resort)
+  const HARDCODED_MINT = "5o5xUwYKZ4YGFFsEgz1T7j9W2pNU6t1T4ucfTVESpump";
+  let mintAddress = process.env.PCAST_TOKEN_ADDRESS || HARDCODED_MINT;
   try {
     const { rows } = await pool.query("SELECT address FROM token_config WHERE id = 1");
-    mintAddress = rows[0]?.address || null;
+    mintAddress = (rows[0]?.address || "").trim() || mintAddress;
   } catch (err) {
-    console.error("Token config DB error:", err.message);
-    return res.status(503).json({ success: false, error: "Token config unavailable." });
+    console.error("Token config DB error — using fallback mint address:", err.message);
   }
 
-  if (!mintAddress) {
-    return res.status(503).json({ success: false, error: "Token not configured yet." });
-  }
-
-  // 4 — Check token balance + price in parallel
+  // 4 — Check token balance + USD value in parallel
   let balance = 0;
   let priceUsd = 0;
   try {
@@ -482,6 +478,7 @@ app.post("/api/auth/verify", async (req, res) => {
   }
 
   const balanceUsd = balance * priceUsd;
+  console.log(`[verify] wallet=${wallet} balance=${balance} priceUsd=${priceUsd} balanceUsd=${balanceUsd} required=${MIN_USD_VALUE}`);
   const access = balanceUsd >= MIN_USD_VALUE;
   const expiresAt = access ? Date.now() + ACCESS_TOKEN_TTL_MS : null;
   const accessToken = access
@@ -507,6 +504,36 @@ app.post("/api/auth/verify", async (req, res) => {
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "pumpcast-backend" });
+});
+
+// Temporary debug endpoint — remove after diagnosing the balance/price issue
+app.get("/api/debug/check", async (req, res) => {
+  const wallet = String(req.query.wallet || "").trim();
+  const HARDCODED_MINT = "5o5xUwYKZ4YGFFsEgz1T7j9W2pNU6t1T4ucfTVESpump";
+  let mintAddress = process.env.PCAST_TOKEN_ADDRESS || HARDCODED_MINT;
+  try {
+    const { rows } = await pool.query("SELECT address FROM token_config WHERE id = 1");
+    mintAddress = (rows[0]?.address || "").trim() || mintAddress;
+  } catch {}
+
+  let balance = null, balanceError = null;
+  try { balance = await getSolanaTokenBalance(wallet || "test", mintAddress); }
+  catch (e) { balanceError = e.message; }
+
+  let priceUsd = null, priceError = null;
+  try { priceUsd = await getPcastPriceUsd(mintAddress); }
+  catch (e) { priceError = e.message; }
+
+  res.json({
+    mintAddress,
+    wallet: wallet || "(not provided)",
+    balance,
+    balanceError,
+    priceUsd,
+    priceError,
+    balanceUsd: (balance && priceUsd) ? balance * priceUsd : 0,
+    required: MIN_USD_VALUE,
+  });
 });
 
 app.get("/health/db", async (_req, res) => {

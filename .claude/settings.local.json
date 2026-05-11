@@ -24,7 +24,8 @@
       "Bash(cat admin-react/vite.config.ts)",
       "Bash(npm install *)",
       "Bash(node --check server.js)",
-      "Bash(node --check services/tokenVerifier.js)"
+      "Bash(node --check services/tokenVerifier.js)",
+      "Bash(node -e ' *)"
     ]
   }
 }
