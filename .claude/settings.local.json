@@ -25,7 +25,12 @@
       "Bash(npm install *)",
       "Bash(node --check server.js)",
       "Bash(node --check services/tokenVerifier.js)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(powershell -Command \"Compress-Archive -Path 'extension/*' -DestinationPath 'pumpcast-extension-v0.3.2.zip' -Force\")",
+      "Bash(powershell -Command \"unzip -p pumpcast-extension-v0.3.2.zip config.js\")",
+      "Bash(powershell -Command \"\\(Get-Item pumpcast-extension-v0.3.2.zip\\).Length / 1KB\")",
+      "Bash(powershell -Command \"Compress-Archive -Path 'extension/*' -DestinationPath 'pumpcast-extension-v0.3.3.zip' -Force\")",
+      "Bash(powershell -Command \"unzip -p pumpcast-extension-v0.3.3.zip config.js; unzip -p pumpcast-extension-v0.3.3.zip manifest.json | python -c \\\\\"import sys,json; d=json.load\\(sys.stdin\\); print\\('version:', d['version']\\); print\\('content_scripts:', json.dumps\\(d['content_scripts'], indent=2\\)\\)\\\\\"\")"
     ]
   }
 }

@@ -546,7 +546,7 @@ app.get("/health/db", async (_req, res) => {
   }
 });
 
-app.get("/api/commentator", requireHolderAccess, async (req, res) => {
+app.get("/api/commentator", async (req, res) => {
   const rawAddress = String(req.query.address || "").trim();
   const mode = String(req.query.mode || "race").trim().toLowerCase();
 
